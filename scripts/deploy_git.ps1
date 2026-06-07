@@ -24,18 +24,19 @@ if ($Layer -in @('api', 'all')) {
 }
 
 if ($Layer -in @('web', 'all')) {
-    $webParams = @{
+    $webScript = Join-Path $root 'scripts\deploy_web.ps1'
+    $params = @{
         WebRenderer = $WebRenderer
         NoZip       = $true
     }
+    if ($SkipAnalyze) { $params.SkipAnalyze = $true }
+    if ($SkipBuild) { $params.SkipBuild = $true }
     if ($Layer -eq 'all') {
-        $webParams.All = $true
+        $params.All = $true
     } else {
-        $webParams.Target = $Target
+        $params.Target = $Target
     }
-    if ($SkipAnalyze) { $webParams.SkipAnalyze = $true }
-    if ($SkipBuild) { $webParams.SkipBuild = $true }
-    & (Join-Path $root 'scripts\deploy_web.ps1') @webParams
+    & $webScript @params
 }
 
 Write-Host ''
