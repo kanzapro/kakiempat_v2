@@ -1,7 +1,6 @@
-# Deploy Kaki Empat v2 — git pull dari dalam server (FTP/SFTP + port 2083 diblokir eksternal).
+# Deploy Kaki Empat v2 — git pull dari dalam server (FTP/SFTP diblokir eksternal).
 #
-# Secrets: FTP_USERNAME, FTP_PASSWORD, REPO_CLONE_TOKEN, CPANEL_REPO_PATH
-#          GIT_DEPLOY_SECRET (webhook api.kakiempat.com/git_deploy_hook.php)
+# Secrets: FTP_USERNAME, FTP_PASSWORD, CPANEL_REPO_PATH, GIT_DEPLOY_SECRET (webhook opsional)
 
 name: 🚀 Kaki Empat v2 Git-Pull Deployment (No-FTP Bypass)
 
@@ -30,17 +29,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Validasi kredensial
+      - name: Validasi kredensial cPanel
         run: |
-          ok=false
-          if [[ -n "${{ secrets.GIT_DEPLOY_SECRET }}" ]]; then ok=true; echo "Webhook secret OK"; fi
-          if [[ -n "${{ secrets.FTP_USERNAME }}" && -n "${{ secrets.FTP_PASSWORD }}" ]]; then ok=true; echo "cPanel basic auth OK"; fi
-          if [[ "$ok" == "false" ]]; then
-            echo "::error::Butuh GIT_DEPLOY_SECRET atau FTP_USERNAME+FTP_PASSWORD"
+          if [[ -z "${{ secrets.FTP_USERNAME }}" || -z "${{ secrets.FTP_PASSWORD }}" ]]; then
+            echo "::error::Butuh FTP_USERNAME + FTP_PASSWORD (kredensial cPanel) di GitHub Secrets"
             exit 1
           fi
 
-      - name: Provision cPanel Git repo (UAPI, idempotent)
+      - name: Provision cPanel Git repo (idempotent)
         env:
           CPANEL_PASS: ${{ secrets.FTP_PASSWORD }}
           CPANEL_TOKEN: ${{ secrets.CPANEL_API_TOKEN }}
@@ -48,7 +44,34 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           chmod +x scripts/ci/cpanel_curl_retry.sh scripts/ci/provision_cpanel_git.sh
-          bash scripts/ci/provision_cpanel_git.sh || echo "::warning::Provision UAPI gagal — lanjut webhook"
+          bash scripts/ci/provision_cpanel_git.sh || echo "::warning::Provision dilewati"
+
+      - name: 🌐 Git pull + .cpanel.yml via UAPI (retry)
+        env:
+          CPANEL_PASS: ${{ secrets.FTP_PASSWORD }}
+          CPANEL_TOKEN: ${{ secrets.CPANEL_API_TOKEN }}
+          REPO_PATH: ${{ secrets.CPANEL_REPO_PATH }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          REPO_PATH="${REPO_PATH:-/home/kakiempa/repo_kakiempat}"
+          export CPANEL_PASS CPANEL_TOKEN
+          encoded_repo=$(python3 -c "import urllib.parse; print(urllib.parse.quote('''$REPO_PATH'''))")
+          encoded_branch=$(python3 -c "import urllib.parse; print(urllib.parse.quote('''$BRANCH'''))")
+          chmod +x scripts/ci/cpanel_curl_retry.sh
+          resp=$(bash scripts/ci/cpanel_curl_retry.sh "VersionControl/update?repository_root=${encoded_repo}&branch=${encoded_branch}" 10)
+          echo "$resp"
+          echo "$resp" | grep -q '"status":1' || exit 1
+
+      - name: Upload git_deploy_hook.php ke API (bootstrap)
+        env:
+          CPANEL_PASS: ${{ secrets.FTP_PASSWORD }}
+          CPANEL_TOKEN: ${{ secrets.CPANEL_API_TOKEN }}
+        run: |
+          chmod +x scripts/ci/cpanel_curl_retry.sh
+          HOOK="hosting/api.kakiempat.com/git_deploy_hook.php"
+          encoded_dir=$(python3 -c "import urllib.parse; print(urllib.parse.quote('/home/kakiempa/api.kakiempat.com'))")
+          resp=$(bash scripts/ci/cpanel_curl_retry.sh "Fileman/save_file_content?dir=${encoded_dir}&file=git_deploy_hook.php&content@${HOOK}" 5)
+          echo "$resp" | grep -q '"status":1' || echo "::warning::Upload hook gagal (mungkin sudah ada)"
 
       - name: Bootstrap webhook secret di server
         env:
@@ -59,56 +82,20 @@ jobs:
           chmod +x scripts/ci/bootstrap_deploy_hook.sh
           bash scripts/ci/bootstrap_deploy_hook.sh || echo "::warning::Bootstrap secret gagal"
 
-      - name: 🌐 Deploy via HTTPS webhook (port 443, dari dalam server)
-        env:
-          DEPLOY_SECRET: ${{ secrets.GIT_DEPLOY_SECRET }}
-          BRANCH: ${{ github.ref_name }}
-        run: |
-          if [[ -z "${DEPLOY_SECRET:-}" ]]; then
-            echo "GIT_DEPLOY_SECRET belum ada — fallback UAPI update"
-            REPO_PATH="${{ secrets.CPANEL_REPO_PATH }}"
-            REPO_PATH="${REPO_PATH:-/home/kakiempa/repo_kakiempat}"
-            export CPANEL_PASS="${{ secrets.FTP_PASSWORD }}"
-            export CPANEL_TOKEN="${{ secrets.CPANEL_API_TOKEN }}"
-            encoded_repo=$(python3 -c "import urllib.parse; print(urllib.parse.quote('''$REPO_PATH'''))")
-            encoded_branch=$(python3 -c "import urllib.parse; print(urllib.parse.quote('''$BRANCH'''))")
-            chmod +x scripts/ci/cpanel_curl_retry.sh
-            resp=$(bash scripts/ci/cpanel_curl_retry.sh "VersionControl/update?repository_root=${encoded_repo}&branch=${encoded_branch}" 8)
-            echo "$resp"
-            echo "$resp" | grep -q '"status":1' || exit 1
-            exit 0
-          fi
-
-          for url in \
-            "https://www.api.kakiempat.com/git_deploy_hook.php" \
-            "https://api.kakiempat.com/git_deploy_hook.php"; do
-            code=$(curl -sS -o /tmp/hook.json -w "%{http_code}" --max-time 180 \
-              -H "X-Deploy-Secret: ${DEPLOY_SECRET}" \
-              "${url}?branch=${BRANCH}&secret=${DEPLOY_SECRET}" || echo "000")
-            echo "$url -> HTTP $code"
-            cat /tmp/hook.json || true
-            if [[ "$code" == "200" ]] && grep -q '"ok":true' /tmp/hook.json 2>/dev/null; then
-              exit 0
-            fi
-          done
-          echo "::error::Webhook deploy gagal"
-          exit 1
-
       - name: Verifikasi API health
         run: |
-          sleep 20
+          sleep 35
           for url in \
             "https://www.api.kakiempat.com/health.php" \
             "https://api.kakiempat.com/health.php"; do
             code=$(curl -sS -o /tmp/health.json -w "%{http_code}" --max-time 30 "$url" || echo "000")
             echo "$url -> HTTP $code"
             if [[ "$code" == "200" ]]; then
-              cat /tmp/hook.json 2>/dev/null || true
               cat /tmp/health.json
               exit 0
             fi
           done
-          echo "::warning::Health check timeout — deploy mungkin masih berjalan."
+          echo "::warning::Health check timeout — cek log cPanel Git deploy."
 
       - name: Ringkasan
         run: echo "Deploy selesai."
