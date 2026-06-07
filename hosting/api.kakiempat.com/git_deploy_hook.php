@@ -1,68 +1,74 @@
 <?php
 /**
- * Webhook deploy internal — git pull + cpanel_deploy.sh dari dalam server (port 443).
- * Secret: .git_deploy_secret di docroot API (ditulis via bootstrap_deploy_hook.sh).
+ * Webhook deploy — picu VersionControl/update dari dalam server (localhost:2083).
+ * Menghindari blokir FTP/port eksternal dan disable_functions exec().
  */
 declare(strict_types=1);
 
 header('Content-Type: application/json; charset=utf-8');
 
-$repo = '/home/kakiempa/repo_kakiempat';
-$branch = preg_replace('/[^a-zA-Z0-9_\\-]/', '', (string) ($_GET['branch'] ?? 'main')) ?: 'main';
-$cloneUrl = 'https://github.com/kanzapro/kakiempat_v2.git';
-
+$configFile = __DIR__ . '/.git_deploy_config.php';
 $secretFile = __DIR__ . '/.git_deploy_secret';
-$expected = is_readable($secretFile) ? trim((string) file_get_contents($secretFile)) : '';
+
 $provided = trim((string) ($_GET['secret'] ?? $_SERVER['HTTP_X_DEPLOY_SECRET'] ?? ''));
+$expected = is_readable($secretFile) ? trim((string) file_get_contents($secretFile)) : '';
 
 if ($expected === '' || $provided === '' || !hash_equals($expected, $provided)) {
     http_response_code(403);
-    echo json_encode(['ok' => false, 'error' => 'forbidden', 'has_secret_file' => $expected !== '']);
+    echo json_encode(['ok' => false, 'error' => 'forbidden']);
     exit;
 }
 
-$log = [];
-$run = static function (string $cmd) use (&$log): int {
-    $out = [];
-    exec($cmd . ' 2>&1', $out, $code);
-    $log[] = ['cmd' => $cmd, 'code' => $code, 'out' => implode("\n", $out)];
-    return $code;
-};
-
-if (!is_dir($repo)) {
-    mkdir($repo, 0755, true);
+if (($_GET['action'] ?? '') === 'ping') {
+    echo json_encode(['ok' => true, 'ping' => true, 'has_config' => is_readable($configFile)]);
+    exit;
 }
 
-if (!is_dir($repo . '/.git')) {
-    $code = $run('git clone --branch ' . escapeshellarg($branch) . ' --depth 1 ' . escapeshellarg($cloneUrl) . ' ' . escapeshellarg($repo));
-    if ($code !== 0) {
-        http_response_code(500);
-        echo json_encode(['ok' => false, 'error' => 'clone_failed', 'log' => $log]);
+if (!is_readable($configFile)) {
+    http_response_code(503);
+    echo json_encode(['ok' => false, 'error' => 'missing_config']);
+    exit;
+}
+
+/** @var array{cpanel_user:string,cpanel_pass:string,repo_path:string,cpanel_host:string} $cfg */
+$cfg = require $configFile;
+
+$branch = preg_replace('/[^a-zA-Z0-9_\\-]/', '', (string) ($_GET['branch'] ?? 'main')) ?: 'main';
+$host = $cfg['cpanel_host'] ?? '127.0.0.1';
+$repo = $cfg['repo_path'] ?? '/home/kakiempa/repo_kakiempat';
+$user = $cfg['cpanel_user'] ?? 'kakiempa';
+$pass = $cfg['cpanel_pass'] ?? '';
+
+$query = http_build_query([
+    'repository_root' => $repo,
+    'branch' => $branch,
+]);
+
+$urls = [
+    "https://{$host}:2083/execute/VersionControl/update?{$query}",
+    'https://kakiempat.com:2083/execute/VersionControl/update?' . $query,
+];
+
+$last = null;
+foreach ($urls as $url) {
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_USERPWD => "{$user}:{$pass}",
+        CURLOPT_HTTPHEADER => ['Accept: application/json'],
+        CURLOPT_CONNECTTIMEOUT => 30,
+        CURLOPT_TIMEOUT => 300,
+        CURLOPT_SSL_VERIFYPEER => false,
+    ]);
+    $body = curl_exec($ch);
+    $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    $last = ['url' => $url, 'http' => $code, 'body' => $body];
+    if ($code === 200 && is_string($body) && str_contains($body, '"status":1')) {
+        echo json_encode(['ok' => true, 'via' => 'VersionControl/update', 'detail' => $last]);
         exit;
     }
 }
 
-foreach ([
-    'cd ' . escapeshellarg($repo) . ' && git fetch origin ' . escapeshellarg($branch),
-    'cd ' . escapeshellarg($repo) . ' && git checkout ' . escapeshellarg($branch),
-    'cd ' . escapeshellarg($repo) . ' && git pull origin ' . escapeshellarg($branch),
-] as $cmd) {
-    if ($run($cmd) !== 0) {
-        http_response_code(500);
-        echo json_encode(['ok' => false, 'error' => 'git_failed', 'log' => $log]);
-        exit;
-    }
-}
-
-$deployScript = $repo . '/scripts/ci/cpanel_deploy.sh';
-if (is_file($deployScript)) {
-    if ($run('bash ' . escapeshellarg($deployScript)) !== 0) {
-        http_response_code(500);
-        echo json_encode(['ok' => false, 'error' => 'deploy_failed', 'log' => $log]);
-        exit;
-    }
-} else {
-    $log[] = ['cmd' => 'skip', 'code' => 0, 'out' => 'cpanel_deploy.sh belum ada — pull saja'];
-}
-
-echo json_encode(['ok' => true, 'branch' => $branch, 'log' => $log]);
+http_response_code(500);
+echo json_encode(['ok' => false, 'error' => 'uapi_failed', 'detail' => $last]);

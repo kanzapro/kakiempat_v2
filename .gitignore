@@ -65,6 +65,8 @@ hosting/api.kakiempat.com/.payment_webhook_secret
 hosting/api.kakiempat.com/.payment_config.php
 hosting/api.kakiempat.com/.migrate_v2_secret
 hosting/api.kakiempat.com/.notifications_path.php
+hosting/api.kakiempat.com/.git_deploy_config.php
+hosting/api.kakiempat.com/.git_deploy_secret
 
 # Android / Gradle build artifacts
 android_app/**/build/
