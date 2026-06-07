@@ -51,16 +51,18 @@ jobs:
           CPANEL_TOKEN: ${{ secrets.CPANEL_API_TOKEN }}
           REPO_CLONE_TOKEN: ${{ secrets.REPO_CLONE_TOKEN }}
           CPANEL_REPO_PATH: ${{ secrets.CPANEL_REPO_PATH }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
           DEPLOY_BRANCH: ${{ github.ref_name }}
-        run: bash scripts/ci/provision_cpanel_git.sh || echo "::warning::Provision dilewati — lanjut update jika repo sudah ada"
+        run: bash scripts/ci/provision_cpanel_git.sh
 
       - name: 🌐 Pull & deploy via cPanel VersionControl API
         env:
           CPANEL_PASS: ${{ secrets.FTP_PASSWORD }}
           CPANEL_TOKEN: ${{ secrets.CPANEL_API_TOKEN }}
-          REPO_PATH: ${{ secrets.CPANEL_REPO_PATH || '/home/kakiempa/repo_kakiempat' }}
+          REPO_PATH: ${{ secrets.CPANEL_REPO_PATH }}
           BRANCH: ${{ github.ref_name }}
         run: |
+          REPO_PATH="${REPO_PATH:-/home/kakiempa/repo_kakiempat}"
           encoded_repo=$(python3 -c "import urllib.parse; print(urllib.parse.quote('''$REPO_PATH'''))")
           encoded_branch=$(python3 -c "import urllib.parse; print(urllib.parse.quote('''$BRANCH'''))")
           url="https://${{ env.CPANEL_HOST }}:2083/execute/VersionControl/update"

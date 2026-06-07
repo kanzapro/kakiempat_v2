@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Provision cPanel Git repo jika belum ada — dipanggil dari GitHub Actions.
+# Provision cPanel Git repo (idempotent). Clone HTTPS tanpa password (repo public).
 set -euo pipefail
 
 CPANEL_HOST="${CPANEL_HOST:-kakiempat.com}"
@@ -7,7 +7,6 @@ CPANEL_USER="${CPANEL_USER:-kakiempa}"
 REPO_PATH="${CPANEL_REPO_PATH:-/home/kakiempa/repo_kakiempat}"
 REPO_NAME="${CPANEL_REPO_NAME:-kakiempat_v2}"
 GITHUB_REPO="${GITHUB_REPOSITORY:-kanzapro/kakiempat_v2}"
-BRANCH="${DEPLOY_BRANCH:-main}"
 
 if [[ -z "${CPANEL_PASS:-}" && -z "${CPANEL_TOKEN:-}" ]]; then
   echo "CPANEL_PASS atau CPANEL_TOKEN wajib diisi" >&2
@@ -31,30 +30,24 @@ if echo "$retrieve" | grep -q "\"repository_root\":\"${REPO_PATH}\""; then
   exit 0
 fi
 
-if [[ -z "${REPO_CLONE_TOKEN:-}" ]]; then
-  echo "REPO_CLONE_TOKEN kosong — tidak bisa clone private repo. Buat repo manual di cPanel Git." >&2
-  exit 1
-fi
-
-export GITHUB_REPO
-source_repo=$(python3 - <<'PY'
+clone_url="https://github.com/${GITHUB_REPO}.git"
+source_repo=$(CLONE_URL="$clone_url" python3 - <<'PY'
 import json, os, urllib.parse
-token = os.environ["REPO_CLONE_TOKEN"]
-repo = os.environ["GITHUB_REPO"]
-clone_url = f"https://x-access-token:{token}@github.com/{repo}.git"
-print(urllib.parse.quote(json.dumps({"remote_name": "origin", "url": clone_url})))
+print(urllib.parse.quote(json.dumps({"remote_name": "origin", "url": os.environ["CLONE_URL"]})))
 PY
 )
 
-echo "Membuat repo Git: $REPO_NAME -> $REPO_PATH"
 encoded_root=$(python3 -c "import urllib.parse; print(urllib.parse.quote('''$REPO_PATH'''))")
 encoded_name=$(python3 -c "import urllib.parse; print(urllib.parse.quote('''$REPO_NAME'''))")
-create=$(cpanel_curl "VersionControl/create?repository_root=${encoded_root}&name=${encoded_name}&type=git&source_repository=${source_repo}")
 
+echo "Membuat repo Git: $REPO_NAME -> $REPO_PATH"
+create=$(cpanel_curl "VersionControl/create?repository_root=${encoded_root}&name=${encoded_name}&type=git&source_repository=${source_repo}")
 echo "$create"
+
 if ! echo "$create" | grep -q '"status":1'; then
   echo "VersionControl/create gagal" >&2
   exit 1
 fi
 
-echo "Repo dibuat — clone berjalan di background Task Queue cPanel."
+echo "Clone awal berjalan di Task Queue cPanel — tunggu..."
+sleep 25
