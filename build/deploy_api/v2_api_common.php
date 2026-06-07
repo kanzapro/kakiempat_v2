@@ -33,19 +33,60 @@ function v2ApiAssertLocalMysqlHost(string $host): void
     }
 }
 
-function v2ApiPdo(): PDO
+/** @param array<string, mixed> $cfg */
+function v2ApiBuildPdoOptions(array $cfg): array
 {
-    static $pdo = null;
-    if ($pdo instanceof PDO) {
-        return $pdo;
+    $options = [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        PDO::ATTR_EMULATE_PREPARES => false,
+    ];
+
+    $connectTimeout = (int) ($cfg['connect_timeout'] ?? 5);
+    if ($connectTimeout > 0) {
+        $options[PDO::ATTR_TIMEOUT] = $connectTimeout;
+        if (defined('PDO::MYSQL_ATTR_CONNECT_TIMEOUT')) {
+            $options[PDO::MYSQL_ATTR_CONNECT_TIMEOUT] = $connectTimeout;
+        }
     }
+
+    if (!empty($cfg['persistent'])) {
+        $options[PDO::ATTR_PERSISTENT] = true;
+    }
+
+    if (defined('PDO::MYSQL_ATTR_INIT_COMMAND')) {
+        $options[PDO::MYSQL_ATTR_INIT_COMMAND] =
+            "SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci, time_zone = '+00:00'";
+    }
+
+    return $options;
+}
+
+function v2ApiPdoPing(PDO $pdo): bool
+{
+    try {
+        $pdo->query('SELECT 1');
+
+        return true;
+    } catch (PDOException $e) {
+        $code = (int) ($e->errorInfo[1] ?? 0);
+        $goneAway = in_array($code, [2006, 2013], true)
+            || str_contains(strtolower($e->getMessage()), 'gone away');
+
+        return !$goneAway;
+    }
+}
+
+function v2ApiCreatePdo(): PDO
+{
     $configFile = __DIR__ . '/.mysql_v2.php';
     if (!is_readable($configFile)) {
         v2ApiFail('config_missing', 'Layanan belum siap. Hubungi admin.', 503);
     }
-    /** @var array{host:string,db:string,user:string,pass:string,port?:int} $cfg */
+    /** @var array{host:string,db:string,user:string,pass:string,port?:int,persistent?:bool,connect_timeout?:int} $cfg */
     $cfg = require $configFile;
     v2ApiAssertLocalMysqlHost((string) ($cfg['host'] ?? ''));
+
     $pdo = new PDO(
         sprintf(
             'mysql:host=%s;port=%d;dbname=%s;charset=utf8mb4',
@@ -55,15 +96,62 @@ function v2ApiPdo(): PDO
         ),
         $cfg['user'],
         $cfg['pass'],
-        [
-            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-            PDO::ATTR_EMULATE_PREPARES => false,
-        ],
+        v2ApiBuildPdoOptions($cfg),
     );
-    $pdo->exec('SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci');
-    $pdo->exec("SET time_zone = '+00:00'");
+
+    if (!defined('PDO::MYSQL_ATTR_INIT_COMMAND')) {
+        $pdo->exec('SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci');
+        $pdo->exec("SET time_zone = '+00:00'");
+    }
+
     return $pdo;
+}
+
+function v2ApiPdo(): PDO
+{
+    static $pdo = null;
+    if ($pdo instanceof PDO) {
+        if (!v2ApiPdoPing($pdo)) {
+            $pdo = null;
+        } else {
+            return $pdo;
+        }
+    }
+
+    $pdo = v2ApiCreatePdo();
+
+    return $pdo;
+}
+
+/** @return array<string, int|float|null> */
+function v2ApiMysqlPoolMetrics(?PDO $pdo = null): array
+{
+    try {
+        $pdo = $pdo ?? v2ApiPdo();
+        $vars = $pdo->query(
+            "SHOW GLOBAL VARIABLES WHERE Variable_name IN ('max_connections', 'wait_timeout')",
+        )->fetchAll(PDO::FETCH_KEY_PAIR);
+        $status = $pdo->query(
+            "SHOW GLOBAL STATUS WHERE Variable_name IN (
+                'Threads_connected', 'Threads_running', 'Max_used_connections', 'Aborted_connects'
+            )",
+        )->fetchAll(PDO::FETCH_KEY_PAIR);
+
+        $maxConn = (int) ($vars['max_connections'] ?? 0);
+        $threads = (int) ($status['Threads_connected'] ?? 0);
+
+        return [
+            'max_connections' => $maxConn,
+            'threads_connected' => $threads,
+            'threads_running' => (int) ($status['Threads_running'] ?? 0),
+            'max_used_connections' => (int) ($status['Max_used_connections'] ?? 0),
+            'aborted_connects' => (int) ($status['Aborted_connects'] ?? 0),
+            'wait_timeout_sec' => (int) ($vars['wait_timeout'] ?? 0),
+            'utilization_pct' => $maxConn > 0 ? round(($threads / $maxConn) * 100, 2) : null,
+        ];
+    } catch (Throwable) {
+        return [];
+    }
 }
 
 /** @return array<string, mixed> */

@@ -79,23 +79,63 @@ function kakiempat_sitter_v2_save_profile(array $body): void
     $name = (string) ($user['name'] ?? 'Pengasuh');
     $phone = (string) ($user['whatsapp'] ?? $auth['phone']);
 
+    require_once __DIR__ . '/kakiempat_geo_v2.php';
+    $hasGeoCols = kakiempat_geo_v2_has_indexed_coords($pdo, 'kakiempa_v2_sitter_profiles');
+
     $stmt = $pdo->prepare(
         'SELECT user_id FROM kakiempa_v2_sitter_profiles WHERE user_id = ? LIMIT 1',
     );
     $stmt->execute([$auth['user_id']]);
     if ($stmt->fetchColumn()) {
-        $pdo->prepare(
-            'UPDATE kakiempa_v2_sitter_profiles
-             SET address = ?, profile_json = ?,
-                 display_name = ?, legal_name = ?, whatsapp = ?
-             WHERE user_id = ?',
-        )->execute([$address, $jsonProfile, $name, $name, $phone, $auth['user_id']]);
+        if ($hasGeoCols) {
+            $pdo->prepare(
+                'UPDATE kakiempa_v2_sitter_profiles
+                 SET address = ?, profile_json = ?, latitude = ?, longitude = ?,
+                     display_name = ?, legal_name = ?, whatsapp = ?
+                 WHERE user_id = ?',
+            )->execute([
+                $address,
+                $jsonProfile,
+                $latitude,
+                $longitude,
+                $name,
+                $name,
+                $phone,
+                $auth['user_id'],
+            ]);
+        } else {
+            $pdo->prepare(
+                'UPDATE kakiempa_v2_sitter_profiles
+                 SET address = ?, profile_json = ?,
+                     display_name = ?, legal_name = ?, whatsapp = ?
+                 WHERE user_id = ?',
+            )->execute([$address, $jsonProfile, $name, $name, $phone, $auth['user_id']]);
+        }
     } else {
-        $pdo->prepare(
-            'INSERT INTO kakiempa_v2_sitter_profiles
-                (user_id, display_name, legal_name, whatsapp, address, status, profile_json)
-             VALUES (?, ?, ?, ?, ?, ?, ?)',
-        )->execute([$auth['user_id'], $name, $name, $phone, $address, 'draft', $jsonProfile]);
+        if ($hasGeoCols) {
+            $pdo->prepare(
+                'INSERT INTO kakiempa_v2_sitter_profiles
+                    (user_id, display_name, legal_name, whatsapp, address, status,
+                     profile_json, latitude, longitude)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            )->execute([
+                $auth['user_id'],
+                $name,
+                $name,
+                $phone,
+                $address,
+                'draft',
+                $jsonProfile,
+                $latitude,
+                $longitude,
+            ]);
+        } else {
+            $pdo->prepare(
+                'INSERT INTO kakiempa_v2_sitter_profiles
+                    (user_id, display_name, legal_name, whatsapp, address, status, profile_json)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)',
+            )->execute([$auth['user_id'], $name, $name, $phone, $address, 'draft', $jsonProfile]);
+        }
     }
 
     kakiempat_sitter_v2_get_profile();

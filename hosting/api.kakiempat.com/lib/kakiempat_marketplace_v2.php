@@ -7,6 +7,7 @@ require_once __DIR__ . '/kakiempat_service_v2.php';
 require_once __DIR__ . '/kakiempat_sitter_v2.php';
 require_once __DIR__ . '/kakiempat_platform_fee_v2.php';
 require_once __DIR__ . '/kakiempat_event_notifications.php';
+require_once __DIR__ . '/kakiempat_geo_v2.php';
 
 /** @param array<string, mixed> $body */
 function kakiempat_marketplace_v2_create_request(array $body): void
@@ -53,24 +54,48 @@ function kakiempat_marketplace_v2_create_request(array $body): void
     $hasDateLabel = v2ApiColumnExists($pdo, 'kakiempa_v2_requests', 'date_label');
     $hasLocation = v2ApiColumnExists($pdo, 'kakiempa_v2_requests', 'location_json');
 
+    $hasGeoCols = kakiempat_geo_v2_has_indexed_coords($pdo, 'kakiempa_v2_requests');
+
     if ($hasDateLabel && $hasLocation) {
-        $pdo->prepare(
-            'INSERT INTO kakiempa_v2_requests
-                (owner_user_id, status, service_code, date_label, time_range, location_json,
-                 notes, pet_ids, total_price, payment_amount)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        )->execute([
-            $auth['user_id'],
-            'open',
-            $serviceType,
-            $dateLabel,
-            $timeRange,
-            $locationJson,
-            $notes !== '' ? $notes : null,
-            $petIdsJson,
-            $totalPrice,
-            $paymentAmount,
-        ]);
+        if ($hasGeoCols) {
+            $pdo->prepare(
+                'INSERT INTO kakiempa_v2_requests
+                    (owner_user_id, status, service_code, date_label, time_range, location_json,
+                     latitude, longitude, notes, pet_ids, total_price, payment_amount)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            )->execute([
+                $auth['user_id'],
+                'open',
+                $serviceType,
+                $dateLabel,
+                $timeRange,
+                $locationJson,
+                $location['latitude'],
+                $location['longitude'],
+                $notes !== '' ? $notes : null,
+                $petIdsJson,
+                $totalPrice,
+                $paymentAmount,
+            ]);
+        } else {
+            $pdo->prepare(
+                'INSERT INTO kakiempa_v2_requests
+                    (owner_user_id, status, service_code, date_label, time_range, location_json,
+                     notes, pet_ids, total_price, payment_amount)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            )->execute([
+                $auth['user_id'],
+                'open',
+                $serviceType,
+                $dateLabel,
+                $timeRange,
+                $locationJson,
+                $notes !== '' ? $notes : null,
+                $petIdsJson,
+                $totalPrice,
+                $paymentAmount,
+            ]);
+        }
     } else {
         $pdo->prepare(
             'INSERT INTO kakiempa_v2_requests
@@ -169,17 +194,31 @@ function kakiempat_marketplace_v2_list_requests(): void
         $extraCols .= ', r.location_json';
     }
 
-    $reqLatSql = kakiempat_marketplace_v2_sql_json_latitude('r.location_json');
-    $reqLngSql = kakiempat_marketplace_v2_sql_json_longitude('r.location_json');
+    $reqCoords = kakiempat_geo_v2_resolve_coord_sql(
+        $pdo,
+        'kakiempa_v2_requests',
+        'r',
+        'location_json',
+    );
+    $reqLatSql = $reqCoords['lat_sql'];
+    $reqLngSql = $reqCoords['lng_sql'];
 
     if ($useSpatial && $radius !== null && $radius > 0) {
-        $distanceSql = kakiempat_marketplace_v2_sql_haversine_km(
+        $bbox = kakiempat_geo_v2_bounding_box(
+            $sitterCoords['latitude'],
+            $sitterCoords['longitude'],
+            $radius,
+        );
+        $distanceSql = kakiempat_geo_v2_sql_haversine_km(
             $reqLatSql,
             $reqLngSql,
             '?',
             '?',
             '?',
         );
+        $bboxSql = $reqCoords['use_bbox']
+            ? ' AND r.latitude BETWEEN ? AND ? AND r.longitude BETWEEN ? AND ?'
+            : '';
         $sql = "SELECT r.id, r.owner_user_id, r.service_code, r.scheduled_at, r.notes,
                        r.pet_ids, r.total_price, r.payment_amount, r.status, r.created_at,
                        u.name AS owner_name{$extraCols},
@@ -187,9 +226,12 @@ function kakiempat_marketplace_v2_list_requests(): void
                 FROM kakiempa_v2_requests r
                 INNER JOIN kakiempa_v2_users u ON u.id = r.owner_user_id
                 WHERE r.status = ? AND r.service_code IN ({$placeholders})
-                  AND {$reqLatSql} IS NOT NULL AND {$reqLngSql} IS NOT NULL
+                  AND {$reqLatSql} IS NOT NULL AND {$reqLngSql} IS NOT NULL{$bboxSql}
                 HAVING distance_km <= ?
                 ORDER BY distance_km ASC";
+        $bboxParams = $reqCoords['use_bbox']
+            ? [$bbox['min_lat'], $bbox['max_lat'], $bbox['min_lng'], $bbox['max_lng']]
+            : [];
         $params = array_merge(
             [
                 $sitterCoords['latitude'],
@@ -197,6 +239,7 @@ function kakiempat_marketplace_v2_list_requests(): void
                 $sitterCoords['latitude'],
             ],
             $params,
+            $bboxParams,
             [$radius],
         );
     } else {
@@ -676,19 +719,12 @@ function kakiempat_marketplace_v2_resolve_sitter_coordinates(PDO $pdo, int $user
 
 function kakiempat_marketplace_v2_sql_json_latitude(string $jsonColumn): string
 {
-    return "COALESCE(
-        CAST(NULLIF(JSON_UNQUOTE(JSON_EXTRACT({$jsonColumn}, '$.latitude')), 'null') AS DECIMAL(10,7)),
-        CAST(NULLIF(JSON_UNQUOTE(JSON_EXTRACT({$jsonColumn}, '$.lat')), 'null') AS DECIMAL(10,7))
-    )";
+    return kakiempat_geo_v2_sql_json_latitude($jsonColumn);
 }
 
 function kakiempat_marketplace_v2_sql_json_longitude(string $jsonColumn): string
 {
-    return "COALESCE(
-        CAST(NULLIF(JSON_UNQUOTE(JSON_EXTRACT({$jsonColumn}, '$.longitude')), 'null') AS DECIMAL(10,7)),
-        CAST(NULLIF(JSON_UNQUOTE(JSON_EXTRACT({$jsonColumn}, '$.lng')), 'null') AS DECIMAL(10,7)),
-        CAST(NULLIF(JSON_UNQUOTE(JSON_EXTRACT({$jsonColumn}, '$.lon')), 'null') AS DECIMAL(10,7))
-    )";
+    return kakiempat_geo_v2_sql_json_longitude($jsonColumn);
 }
 
 function kakiempat_marketplace_v2_sql_haversine_km(
@@ -698,11 +734,13 @@ function kakiempat_marketplace_v2_sql_haversine_km(
     string $originLngParam,
     string $originLatParamRepeat,
 ): string {
-    return "(6371 * ACOS(LEAST(1, GREATEST(-1,
-        COS(RADIANS({$originLatParam})) * COS(RADIANS({$latSql})) *
-        COS(RADIANS({$lngSql}) - RADIANS({$originLngParam})) +
-        SIN(RADIANS({$originLatParamRepeat})) * SIN(RADIANS({$latSql}))
-    ))))";
+    return kakiempat_geo_v2_sql_haversine_km(
+        $latSql,
+        $lngSql,
+        $originLatParam,
+        $originLngParam,
+        $originLatParamRepeat,
+    );
 }
 
 function kakiempat_marketplace_v2_count_sitters_in_radius(
@@ -716,9 +754,16 @@ function kakiempat_marketplace_v2_count_sitters_in_radius(
         ? $radiusKm
         : kakiempat_marketplace_v2_broadcast_radius_km();
 
-    $sitterLatSql = kakiempat_marketplace_v2_sql_json_latitude('sp.profile_json');
-    $sitterLngSql = kakiempat_marketplace_v2_sql_json_longitude('sp.profile_json');
-    $distanceSql = kakiempat_marketplace_v2_sql_haversine_km(
+    $sitterCoords = kakiempat_geo_v2_resolve_coord_sql(
+        $pdo,
+        'kakiempa_v2_sitter_profiles',
+        'sp',
+        'profile_json',
+    );
+    $sitterLatSql = $sitterCoords['lat_sql'];
+    $sitterLngSql = $sitterCoords['lng_sql'];
+    $bbox = kakiempat_geo_v2_bounding_box($latitude, $longitude, $radius);
+    $distanceSql = kakiempat_geo_v2_sql_haversine_km(
         $sitterLatSql,
         $sitterLngSql,
         '?',
@@ -726,6 +771,9 @@ function kakiempat_marketplace_v2_count_sitters_in_radius(
         '?',
     );
     $serviceJson = json_encode($serviceCode, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    $bboxSql = $sitterCoords['use_bbox']
+        ? ' AND sp.latitude BETWEEN ? AND ? AND sp.longitude BETWEEN ? AND ?'
+        : '';
 
     $stmt = $pdo->prepare(
         "SELECT COUNT(*) FROM (
@@ -733,7 +781,7 @@ function kakiempat_marketplace_v2_count_sitters_in_radius(
             FROM kakiempa_v2_sitter_profiles sp
             WHERE sp.status = 'approved'
               AND {$sitterLatSql} IS NOT NULL
-              AND {$sitterLngSql} IS NOT NULL
+              AND {$sitterLngSql} IS NOT NULL{$bboxSql}
               AND JSON_CONTAINS(sp.profile_json, ?, '$.services')
               AND (
                 JSON_EXTRACT(sp.profile_json, '$.is_available') IS NULL
@@ -742,7 +790,14 @@ function kakiempat_marketplace_v2_count_sitters_in_radius(
             HAVING distance_km <= ?
          ) AS nearby_sitters",
     );
-    $stmt->execute([$latitude, $longitude, $latitude, $serviceJson, $radius]);
+    $bboxParams = $sitterCoords['use_bbox']
+        ? [$bbox['min_lat'], $bbox['max_lat'], $bbox['min_lng'], $bbox['max_lng']]
+        : [];
+    $stmt->execute(array_merge(
+        [$latitude, $longitude, $latitude],
+        $bboxParams,
+        [$serviceJson, $radius],
+    ));
 
     return (int) ($stmt->fetchColumn() ?: 0);
 }
@@ -750,17 +805,24 @@ function kakiempat_marketplace_v2_count_sitters_in_radius(
 /** @return array{latitude: float, longitude: float}|null */
 function kakiempat_marketplace_v2_sitter_coordinates(PDO $pdo, int $userId): ?array
 {
+    $hasGeo = kakiempat_geo_v2_has_indexed_coords($pdo, 'kakiempa_v2_sitter_profiles');
+    $cols = $hasGeo ? 'latitude, longitude, profile_json' : 'profile_json';
     $stmt = $pdo->prepare(
-        'SELECT profile_json FROM kakiempa_v2_sitter_profiles WHERE user_id = ? LIMIT 1',
+        "SELECT {$cols} FROM kakiempa_v2_sitter_profiles WHERE user_id = ? LIMIT 1",
     );
     $stmt->execute([$userId]);
-    $raw = $stmt->fetchColumn();
-    if ($raw === false) {
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!is_array($row)) {
         return null;
     }
-    $meta = kakiempat_sitter_v2_decode_json((string) $raw);
-    $lat = $meta['latitude'] ?? null;
-    $lng = $meta['longitude'] ?? null;
+
+    $lat = $row['latitude'] ?? null;
+    $lng = $row['longitude'] ?? null;
+    if (!is_numeric($lat) || !is_numeric($lng)) {
+        $meta = kakiempat_sitter_v2_decode_json((string) ($row['profile_json'] ?? ''));
+        $lat = $meta['latitude'] ?? null;
+        $lng = $meta['longitude'] ?? null;
+    }
     if (!is_numeric($lat) || !is_numeric($lng)) {
         return null;
     }

@@ -13,4 +13,10 @@ return [
     'user' => 'kakiempa_v2_user',
     'pass' => 'GANTI_PASSWORD_KUAT_MIN_16_KARAKTER',
     'port' => 3306,
+
+    // Pooling (6 subdomain → 1 API → MySQL localhost):
+    // persistent=true → reuse koneksi per PHP-FPM worker (kurangi overhead connect).
+    // Pastikan max_connections MySQL >= jumlah worker FPM aktif.
+    'persistent' => false,
+    'connect_timeout' => 5,
 ];

@@ -464,6 +464,7 @@ function kakiempat_admin_v2_agent_health(): void
         'php_version' => PHP_VERSION,
         'disk_free_space_bytes' => disk_free_space($diskPath) ?: null,
         'database_status' => $mysqlOk ? 'connected' : 'error',
+        'mysql_pool' => v2ApiMysqlPoolMetrics($pdo),
         'api_docroot' => 'api.kakiempat.com',
         'money_engine_metrics' => [
             'today_bookings' => $todayBookings,

@@ -16,3 +16,10 @@
 
 -- 4) Charset konsisten
 ALTER DATABASE `kakiempa_v2` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- 5) Kapasitas koneksi simultan (opsional — sesuaikan limit cPanel)
+--    6 subdomain Flutter hanya memanggil api.kakiempat.com; setiap worker PHP-FPM
+--    memegang 1 koneksi MySQL. Pastikan max_connections > pm.max_children.
+-- SET GLOBAL max_connections = 150;
+-- SHOW VARIABLES LIKE 'max_connections';
+-- SHOW GLOBAL STATUS LIKE 'Threads_connected';

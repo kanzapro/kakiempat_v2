@@ -51,10 +51,12 @@ if (($_GET['action'] ?? '') === 'deploy') {
 }
 
 $mysqlOk = false;
+$poolMetrics = [];
 try {
     $pdo = v2ApiPdo();
     $pdo->query('SELECT 1');
     $mysqlOk = true;
+    $poolMetrics = v2ApiMysqlPoolMetrics($pdo);
 } catch (Throwable) {
     $mysqlOk = false;
 }
@@ -63,7 +65,8 @@ http_response_code($mysqlOk ? 200 : 503);
 echo json_encode([
     'ok' => $mysqlOk,
     'service' => 'kakiempat_v2_api',
-    'version' => '0.2.1',
+    'version' => '0.2.2',
     'mysql_ok' => $mysqlOk,
+    'mysql_pool' => $poolMetrics,
     'ts' => date('c'),
 ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
