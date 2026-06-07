@@ -49,8 +49,7 @@ jobs:
           CPANEL_PASS: ${{ secrets.FTP_PASSWORD }}
         run: |
           chmod +x scripts/ci/cpanel_upload_file.sh
-          scripts/ci/cpanel_upload_file.sh /home/kakiempa/api.kakiempat.com health.php hosting/api.kakiempat.com/health.php || \
-          scripts/ci/cpanel_curl_retry.sh "Fileman/save_file_content?dir=%2Fhome%2Fkakiempa%2Fapi.kakiempat.com&file=health.php&content=$(python3 -c "import urllib.parse; print(urllib.parse.quote(open('hosting/api.kakiempat.com/health.php').read()))")" 3 || true
+          scripts/ci/cpanel_upload_file.sh /home/kakiempa/api.kakiempat.com health.php hosting/api.kakiempat.com/health.php
 
       - name: 🌐 Trigger deploy
         env:
