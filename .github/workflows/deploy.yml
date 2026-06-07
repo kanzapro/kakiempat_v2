@@ -1,4 +1,4 @@
-# Deploy Kaki Empat v2 — tanpa FTP. Picu git pull dari server via health.php (port 443).
+# Deploy Kaki Empat v2 — tanpa FTP. Git pull dari server via UAPI + deploy_trigger.
 
 name: 🚀 Kaki Empat v2 Git-Pull Deployment (No-FTP Bypass)
 
@@ -19,7 +19,7 @@ jobs:
   deploy:
     name: ⚡ Deploy via server webhook
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -37,32 +37,58 @@ jobs:
           chmod +x scripts/ci/*.sh
           bash scripts/ci/provision_cpanel_git.sh || true
 
-      - name: Bootstrap secret + config (UAPI GET)
+      - name: Bootstrap secret + config + deploy_trigger
         env:
           CPANEL_PASS: ${{ secrets.FTP_PASSWORD }}
           CPANEL_REPO_PATH: ${{ secrets.CPANEL_REPO_PATH }}
           GIT_DEPLOY_SECRET: ${{ secrets.GIT_DEPLOY_SECRET }}
         run: bash scripts/ci/bootstrap_deploy_hook.sh || true
 
-      - name: 🌐 Trigger deploy (deploy_trigger.php via bootstrap)
+      - name: Git pull via UAPI (task queue, toleransi timeout)
+        env:
+          CPANEL_PASS: ${{ secrets.FTP_PASSWORD }}
+          CPANEL_REPO_PATH: ${{ secrets.CPANEL_REPO_PATH }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          REPO="${CPANEL_REPO_PATH:-/home/kakiempa/repo_kakiempat}"
+          enc_repo=$(python3 -c "import urllib.parse; print(urllib.parse.quote('''$REPO'''))")
+          enc_branch=$(python3 -c "import urllib.parse; print(urllib.parse.quote('''$BRANCH'''))")
+          bash scripts/ci/cpanel_curl_retry.sh \
+            "VersionControl/update?repository_root=${enc_repo}&branch=${enc_branch}" 3 || true
+          echo "Task queue cPanel dimulai — tunggu git pull + .cpanel.yml"
+
+      - name: Trigger deploy (deploy_trigger.php, jika bootstrap berhasil)
         env:
           DEPLOY_SECRET: ${{ secrets.GIT_DEPLOY_SECRET }}
           BRANCH: ${{ github.ref_name }}
         run: |
-          for attempt in $(seq 1 10); do
+          for attempt in $(seq 1 3); do
             for url in https://api.kakiempat.com/deploy_trigger.php https://www.api.kakiempat.com/deploy_trigger.php; do
               code=$(curl -sS -o /tmp/out.json -w "%{http_code}" --max-time 300 \
                 -H "X-Deploy-Secret: ${DEPLOY_SECRET}" \
                 "${url}?branch=${BRANCH}&secret=${DEPLOY_SECRET}" || echo "000")
-              echo "attempt $attempt $url HTTP $code"
+              echo "trigger $attempt $url HTTP $code"
               cat /tmp/out.json || true
               if grep -q '"ok":true' /tmp/out.json 2>/dev/null && grep -q '"http":200' /tmp/out.json 2>/dev/null; then exit 0; fi
-              if grep -q '"status":1' /tmp/out.json 2>/dev/null && grep -q '"ok":true' /tmp/out.json 2>/dev/null; then exit 0; fi
             done
+            sleep 20
+          done
+          echo "deploy_trigger tidak tersedia — lanjut polling (UAPI async)"
+
+      - name: Verifikasi deploy (poll health version)
+        run: |
+          for attempt in $(seq 1 24); do
+            body=$(curl -sS --max-time 30 https://api.kakiempat.com/health.php || echo '{}')
+            echo "poll $attempt: $body"
+            if echo "$body" | grep -q '"version":"0.2.1"'; then
+              echo "$body" | grep mysql_ok
+              exit 0
+            fi
+            if echo "$body" | grep -q '"mysql_ok":true' && echo "$body" | grep -qE '"version":"0\.2\.[2-9]|[1-9][0-9]'; then
+              echo "$body" | grep mysql_ok
+              exit 0
+            fi
             sleep 30
           done
-          echo "::error::Deploy gagal — cek cPanel Git > Update from Remote"
+          echo "::error::Deploy belum terlihat — cek cPanel Git > Deployment log"
           exit 1
-
-      - name: Verifikasi health
-        run: curl -sS --max-time 30 https://api.kakiempat.com/health.php | grep mysql_ok

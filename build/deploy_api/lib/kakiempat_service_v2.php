@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../v2_api_common.php';
+require_once __DIR__ . '/kakiempat_kecamatan_v2.php';
 
 /** @return array<string, array{code: string, title: string, sort_order: int}> */
 function kakiempat_service_v2_load_categories(PDO $pdo): array
@@ -97,6 +98,8 @@ function kakiempat_service_v2_build_catalog_payload(PDO $pdo): array
         'total' => count($services),
         'services' => $services,
         'categories' => $categoryList,
+        'kecamatan' => kakiempat_kecamatan_v2_list_payload(),
+        'service_area' => 'Kota Denpasar',
     ];
 }
 
