@@ -27,11 +27,15 @@ FTP/SFTP **diblokir** firewall hosting. Deploy hanya lewat **git push → cPanel
 4. Branch: `main`
 5. Aktifkan **Pull & Deploy** / deployment hook (`.cpanel.yml` di root repo)
 
-## 2. Buat API Token cPanel
+## 2. GitHub Secrets (wajib)
 
-1. cPanel → **Manage API Tokens** → Create
-2. GitHub → **Settings → Secrets → Actions** → `CPANEL_API_TOKEN`
-3. Opsional: `CPANEL_REPO_PATH` = `/home/kakiempa/repo_kakiempat`
+| Secret | Nilai | Status |
+|--------|-------|--------|
+| `FTP_USERNAME` | Username cPanel (`kakiempa`) | Sudah ada |
+| `FTP_PASSWORD` | Password cPanel | Sudah ada |
+| `REPO_CLONE_TOKEN` | GitHub PAT/OAuth untuk clone private repo | Sudah ada |
+| `CPANEL_REPO_PATH` | `/home/kakiempa/repo_kakiempat` | Sudah ada |
+| `CPANEL_API_TOKEN` | (opsional) API token cPanel — lebih aman dari password | Opsional |
 
 ## 3. Cara deploy (solo dev)
 

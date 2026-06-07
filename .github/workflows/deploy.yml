@@ -1,8 +1,10 @@
 # Deploy Kaki Empat v2 — Git Pull via cPanel (FTP/SFTP diblokir firewall).
-# Alur: build lokal -> git push -> workflow memicu cPanel VersionControl/update -> .cpanel.yml rsync.
+# Alur: artefak di repo -> push -> provision (sekali) -> VersionControl/update -> .cpanel.yml
 #
-# Secrets: CPANEL_API_TOKEN, CPANEL_REPO_PATH (opsional)
-# Lihat .github/DEPLOY_SECRETS.md
+# Secrets: FTP_USERNAME + FTP_PASSWORD (cPanel basic auth, sudah ada)
+#          REPO_CLONE_TOKEN (clone private repo, opsional jika repo sudah dibuat manual)
+#          CPANEL_API_TOKEN (opsional, lebih aman dari password)
+#          CPANEL_REPO_PATH (opsional, default /home/kakiempa/repo_kakiempat)
 
 name: 🚀 Kaki Empat v2 Git-Pull Deployment (No-FTP Bypass)
 
@@ -21,36 +23,61 @@ env:
   CPANEL_HOST: kakiempat.com
   CPANEL_USER: kakiempa
   CPANEL_REPO_PATH: /home/kakiempa/repo_kakiempat
+  CPANEL_REPO_NAME: kakiempat_v2
 
 jobs:
   trigger-cpanel:
     name: ⚡ Trigger cPanel Auto Deployment
     runs-on: ubuntu-latest
     steps:
-      - name: Validasi CPANEL_API_TOKEN
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validasi kredensial cPanel
         run: |
-          if [[ -z "${{ secrets.CPANEL_API_TOKEN }}" ]]; then
-            echo "::error::Secret CPANEL_API_TOKEN belum diisi. Lihat .github/DEPLOY_SECRETS.md"
+          has_token=false
+          has_basic=false
+          if [[ -n "${{ secrets.CPANEL_API_TOKEN }}" ]]; then has_token=true; fi
+          if [[ -n "${{ secrets.FTP_USERNAME }}" && -n "${{ secrets.FTP_PASSWORD }}" ]]; then has_basic=true; fi
+          if [[ "$has_token" == "false" && "$has_basic" == "false" ]]; then
+            echo "::error::Butuh CPANEL_API_TOKEN atau FTP_USERNAME+FTP_PASSWORD di GitHub Secrets"
             exit 1
           fi
+          echo "Auth OK (token=$has_token, basic=$has_basic)"
+
+      - name: Provision cPanel Git repo (idempotent)
+        env:
+          CPANEL_PASS: ${{ secrets.FTP_PASSWORD }}
+          CPANEL_TOKEN: ${{ secrets.CPANEL_API_TOKEN }}
+          REPO_CLONE_TOKEN: ${{ secrets.REPO_CLONE_TOKEN }}
+          CPANEL_REPO_PATH: ${{ secrets.CPANEL_REPO_PATH }}
+          DEPLOY_BRANCH: ${{ github.ref_name }}
+        run: bash scripts/ci/provision_cpanel_git.sh || echo "::warning::Provision dilewati — lanjut update jika repo sudah ada"
 
       - name: 🌐 Pull & deploy via cPanel VersionControl API
         env:
+          CPANEL_PASS: ${{ secrets.FTP_PASSWORD }}
           CPANEL_TOKEN: ${{ secrets.CPANEL_API_TOKEN }}
-          REPO_PATH_SECRET: ${{ secrets.CPANEL_REPO_PATH }}
+          REPO_PATH: ${{ secrets.CPANEL_REPO_PATH || '/home/kakiempa/repo_kakiempat' }}
           BRANCH: ${{ github.ref_name }}
         run: |
-          REPO_PATH="${REPO_PATH_SECRET:-/home/kakiempa/repo_kakiempat}"
           encoded_repo=$(python3 -c "import urllib.parse; print(urllib.parse.quote('''$REPO_PATH'''))")
           encoded_branch=$(python3 -c "import urllib.parse; print(urllib.parse.quote('''$BRANCH'''))")
           url="https://${{ env.CPANEL_HOST }}:2083/execute/VersionControl/update"
           query="repository_root=${encoded_repo}&branch=${encoded_branch}"
 
           echo "Memicu git pull + .cpanel.yml di $REPO_PATH (branch=$BRANCH)"
-          http_code=$(curl -sS -o /tmp/cpanel_response.json -w "%{http_code}" \
-            -H "Authorization: cpanel ${{ env.CPANEL_USER }}:${CPANEL_TOKEN}" \
-            -H "Accept: application/json" \
-            "${url}?${query}" || echo "000")
+          if [[ -n "${CPANEL_TOKEN:-}" ]]; then
+            http_code=$(curl -sS -o /tmp/cpanel_response.json -w "%{http_code}" \
+              -H "Authorization: cpanel ${{ env.CPANEL_USER }}:${CPANEL_TOKEN}" \
+              -H "Accept: application/json" \
+              "${url}?${query}" || echo "000")
+          else
+            http_code=$(curl -sS -o /tmp/cpanel_response.json -w "%{http_code}" \
+              -u "${{ secrets.FTP_USERNAME }}:${CPANEL_PASS}" \
+              -H "Accept: application/json" \
+              "${url}?${query}" || echo "000")
+          fi
 
           echo "cPanel API HTTP $http_code"
           cat /tmp/cpanel_response.json
@@ -68,7 +95,7 @@ jobs:
       - name: Verifikasi API health
         run: |
           echo "Menunggu deploy .cpanel.yml selesai..."
-          sleep 20
+          sleep 30
           for url in \
             "https://www.api.kakiempat.com/health.php" \
             "https://api.kakiempat.com/health.php"; do
@@ -82,4 +109,4 @@ jobs:
           echo "::warning::Health check gagal — cek log deploy di cPanel Git Version Control."
 
       - name: Ringkasan
-        run: echo "Deploy via cPanel git pull selesai. Subdomain web mengikuti artefak di build/deploy/*/web/"
+        run: echo "Deploy via cPanel git pull selesai."
