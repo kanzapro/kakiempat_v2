@@ -49,16 +49,13 @@ jobs:
           chmod +x scripts/ci/cpanel_curl_retry.sh scripts/ci/provision_cpanel_git.sh
           bash scripts/ci/provision_cpanel_git.sh || true
 
-      - name: Upload git_deploy_hook.php ke API
+      - name: Upload deploy hook ke API
         env:
           CPANEL_PASS: ${{ secrets.FTP_PASSWORD }}
         run: |
-          chmod +x scripts/ci/cpanel_curl_retry.sh
-          encoded_dir=$(python3 -c "import urllib.parse; print(urllib.parse.quote('/home/kakiempa/api.kakiempat.com'))")
+          chmod +x scripts/ci/cpanel_upload_file.sh
           for f in git_deploy_hook.php deploy_hook_v2.php; do
-            bash scripts/ci/cpanel_curl_retry.sh \
-              "Fileman/save_file_content?dir=${encoded_dir}&file=${f}&content@hosting/api.kakiempat.com/deploy_hook_v2.php" 5 | tee /tmp/upload.json
-            grep -q '"status":1' /tmp/upload.json
+            scripts/ci/cpanel_upload_file.sh /home/kakiempa/api.kakiempat.com "$f" hosting/api.kakiempat.com/deploy_hook_v2.php
           done
 
       - name: Tulis deploy config di server
