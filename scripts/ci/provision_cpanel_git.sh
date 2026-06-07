@@ -14,13 +14,7 @@ if [[ -z "${CPANEL_PASS:-}" && -z "${CPANEL_TOKEN:-}" ]]; then
 fi
 
 cpanel_curl() {
-  local query="$1"
-  local url="https://${CPANEL_HOST}:2083/execute/${query}"
-  if [[ -n "${CPANEL_TOKEN:-}" ]]; then
-    curl -sS -H "Authorization: cpanel ${CPANEL_USER}:${CPANEL_TOKEN}" -H "Accept: application/json" "$url"
-  else
-    curl -sS -u "${CPANEL_USER}:${CPANEL_PASS}" -H "Accept: application/json" "$url"
-  fi
+  bash "$(dirname "$0")/cpanel_curl_retry.sh" "$1" 5
 }
 
 echo "Cek repo Git di cPanel: $REPO_PATH"

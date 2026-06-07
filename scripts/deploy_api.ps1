@@ -15,7 +15,7 @@ $items = @(
     'apply_v2_migration.php', 'health.php', 'wallet_v2.php',
     'payment_v2.php', 'payment_webhook.php',
     'payment_status.php', 'get_notifications.php', 'get_unread_notifications.php',
-    'backup_db_v2.php', '.htaccess', 'robots.txt',
+    'backup_db_v2.php', 'git_deploy_hook.php', '.htaccess', 'robots.txt',
     'lib', 'schema', 'data', 'backups', 'uploads'
 )
 foreach ($name in $items) {
