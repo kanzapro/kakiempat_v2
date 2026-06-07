@@ -39,7 +39,7 @@ for attempt in $(seq 1 5); do
     cat /tmp/cpanel_upload.json
     exit 0
   fi
-  echo "Upload attempt $attempt/$5 HTTP $http_code" >&2
+  echo "Upload attempt $attempt/5 HTTP $http_code" >&2
   cat /tmp/cpanel_upload.json >&2 || true
   sleep $((attempt * 5))
 done
