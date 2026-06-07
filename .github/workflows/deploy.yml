@@ -82,12 +82,12 @@ jobs:
                 "${url}?branch=${BRANCH}&secret=${DEPLOY_SECRET}" || echo "000")
               echo "attempt $attempt $url -> HTTP $code"
               cat /tmp/hook.json || true
-              if [[ "$code" == "200" ]] && grep -q '"ok":true' /tmp/hook.json 2>/dev/null; then
+              if grep -q '"ok":true' /tmp/hook.json 2>/dev/null; then
                 exit 0
               fi
-              if [[ "$code" == "503" ]]; then
-                echo "Repo belum siap — tunggu clone awal..."
-                sleep 60
+              if [[ "$code" == "403" ]]; then
+                echo "::error::Webhook forbidden — cek GIT_DEPLOY_SECRET vs .git_deploy_secret di server"
+                exit 1
               fi
             done
             sleep 30
