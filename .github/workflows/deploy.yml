@@ -64,7 +64,7 @@ jobs:
                 "${url}?action=deploy&branch=${BRANCH}&secret=${DEPLOY_SECRET}" || echo "000")
               echo "attempt $attempt $url HTTP $code"
               cat /tmp/out.json || true
-              if grep -q '"ok":true' /tmp/out.json 2>/dev/null; then exit 0; fi
+              if grep -q '"http":' /tmp/out.json 2>/dev/null && grep -q '"ok":true' /tmp/out.json 2>/dev/null; then exit 0; fi
             done
             sleep 45
           done
