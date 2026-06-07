@@ -1,0 +1,7 @@
+---
+# cPanel Git™ Version Control — jalankan setelah git pull di server.
+# Repo path disarankan: /home/kakiempa/repo_kakiempat (di luar docroot publik).
+# Docroot sesuai arsitektur 6 subdomain Kaki Empat v2 (bukan public_html/subfolder).
+deployment:
+  tasks:
+    - /bin/bash scripts/ci/cpanel_deploy.sh

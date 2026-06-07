@@ -1,4 +1,4 @@
-# Upload build/release_v2 ZIP + API ke cPanel via FTP (butuh hosting.credentials).
+# Paket release v2 untuk git push (menggantikan upload FTP).
 param(
     [ValidateSet('web', 'api', 'all')]
     [string]$Target = 'all'
@@ -17,12 +17,10 @@ if ($Target -in @('web', 'all')) {
 }
 
 if ($Target -eq 'api') {
-    & (Join-Path $root 'scripts\deploy_via_ftp.ps1') -Target api
+    & (Join-Path $root 'scripts\deploy_git.ps1') -Layer api
 } elseif ($Target -eq 'web') {
-    & (Join-Path $root 'scripts\deploy_via_ftp.ps1') -Target all
+    & (Join-Path $root 'scripts\deploy_git.ps1') -Layer all -WebRenderer html
 } else {
-    & (Join-Path $root 'scripts\deploy_api.ps1')
-    & (Join-Path $root 'scripts\deploy_via_ftp.ps1') -Target api
-    Write-Host 'Upload ZIP manual: ekstrak isi build/release_v2/*.zip ke docroot subdomain.'
-    Write-Host 'Atau: scripts/deploy_web_cpanel.ps1 -SkipBuild (setelah build_release_v2.ps1)'
+    & (Join-Path $root 'scripts\deploy_git.ps1') -Layer all -WebRenderer html
+    Write-Host 'ZIP release_v2 tetap tersedia untuk arsip; deploy produksi via build/deploy + git push.'
 }

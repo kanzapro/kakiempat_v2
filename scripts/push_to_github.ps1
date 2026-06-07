@@ -1,5 +1,5 @@
 # Buat repo GitHub (jika belum ada) dan push branch main.
-# Prasyarat: gh auth login (sekali) + FTP secrets di repo GitHub.
+# Prasyarat: gh auth login (sekali) + CPANEL_API_TOKEN di GitHub Secrets.
 param(
     [string]$RepoName = 'kakiempat_v2',
     [ValidateSet('public', 'private')]

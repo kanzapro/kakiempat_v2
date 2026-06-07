@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Agent Deploy Automation (Kaki Empat v2)
 
-Semua agen **wajib** mengikuti jalur deploy ini. Jangan improvisasi FTP manual atau path docroot salah.
+Semua agen **wajib** mengikuti jalur deploy ini. **FTP/SFTP diblokir** — jangan improvisasi upload FTP atau path docroot salah.
 
 ## Stack & docroot (jangan salah)
 
@@ -13,8 +13,8 @@ Semua agen **wajib** mengikuti jalur deploy ini. Jangan improvisasi FTP manual a
 Flutter web → api.kakiempat.com (PHP) → MySQL kakiempa_v2
 ```
 
-| Target | Docroot FTP (relatif `/home/kakiempa/`) |
-|--------|------------------------------------------|
+| Target | Docroot (relatif `/home/kakiempa/`) |
+|--------|--------------------------------------|
 | API/BFF | `api.kakiempat.com/` |
 | Owner | `owner.kakiempat.com/` |
 | Sitter | `sitter.kakiempat.com/` |
@@ -24,52 +24,46 @@ Flutter web → api.kakiempat.com (PHP) → MySQL kakiempa_v2
 
 **Larangan:** `/public_html/api/` — path itu salah.
 
-## GitHub Actions (utama — hindari blokir IP)
+## Git → cPanel (satu-satunya jalur deploy)
 
-| Workflow | File | Pemicu | Fungsi |
-|----------|------|--------|--------|
-| Super Charge Backend | `.github/workflows/deploy.yml` | Push `main`/`master` + perubahan `hosting/api.kakiempat.com/**` | Delta FTP backend → `api.kakiempat.com/` + cek `health.php` |
-| Deploy Web/API manual | `.github/workflows/deploy-ftp.yml` | Actions → Run workflow | Pilih target: api, owner, sitter, admin, staging, www, owner-and-api |
+| Komponen | Lokasi | Fungsi |
+|----------|--------|--------|
+| Instruksi server | `.cpanel.yml` | rsync artefak setelah git pull |
+| Skrip server | `scripts/ci/cpanel_deploy.sh` | 6 domain + API |
+| Workflow | `.github/workflows/deploy.yml` | Push `main` → `VersionControl/update` |
+| Build lokal | `scripts/deploy_git.ps1` | Paket `build/deploy*` untuk commit |
+| Picu manual | `scripts/trigger_cpanel_deploy.ps1` | UAPI tanpa menunggu GitHub |
 
-**Secrets GitHub (wajib):** `FTP_SERVER`, `FTP_USERNAME`, `FTP_PASSWORD`, `FTP_PORT` (21).  
+**Secrets GitHub (wajib):** `CPANEL_API_TOKEN`. Opsional: `CPANEL_REPO_PATH` (default `/home/kakiempa/repo_kakiempat`).  
 Panduan: `.github/DEPLOY_SECRETS.md`
+
+**Setup cPanel (sekali):** Git™ Version Control → Create repo di `/home/kakiempa/repo_kakiempat` → hubungkan GitHub.
 
 ## Alur kerja agen setelah mengubah kode
 
 ### Backend PHP (BFF, katalog layanan, payment, booking)
 
 1. Edit di `hosting/api.kakiempat.com/**`
-2. Commit lokal — **jangan** stage file rahasia (`.mysql_v2.php`, `.agent_telemetry_secret`, `hosting.credentials`)
-3. `git push` ke `main` atau `master` → Actions **Super Charge** deploy otomatis
+2. Commit — **jangan** stage rahasia (`.mysql_v2.php`, `.agent_telemetry_secret`, `hosting.credentials`)
+3. `.\scripts\deploy_git.ps1 -Layer api` → commit `build/deploy_api/` → `git push origin main`
 4. Verifikasi: `curl https://www.api.kakiempat.com/health.php`
 
 ### Flutter web (owner/sitter/admin/www)
 
-1. Build lokal (opsional uji): `.\scripts\deploy_web.ps1 -Target owner -WebRenderer html`
-2. Push kode ke GitHub, lalu jalankan workflow **Deploy via FTP** target sesuai subdomain  
-   ATAU lokal: `.\scripts\deploy_web.ps1 -Target owner -WebRenderer html -Upload`
-3. Money engine penuh: `.\scripts\deploy_owner.ps1 -Layer both -WebRenderer html -Upload`
+1. `.\scripts\deploy_git.ps1 -Layer web -Target owner -WebRenderer html` (atau `-Layer all`)
+2. `git add build/deploy build/deploy_api` → `git push origin main`
+3. Money engine penuh: `.\scripts\deploy_owner.ps1 -Layer both -WebRenderer html` lalu push
 
-### Deploy lokal (fallback, bukan utama)
-
-```powershell
-.\scripts\deploy_api.ps1
-.\scripts\deploy_via_ftp.ps1 -Target api
-.\scripts\deploy_api_owner.ps1 -Upload   # hanya owner_v2.php (parsial)
-```
-
-**Jangan** upload file satu-per-satu via curl/FTP manual.
+**Jangan** upload via FTP, WinSCP, atau `SamKirkland/FTP-Deploy-Action`.
 
 ## Mata elang — diagnostik mandiri
-
-Setelah deploy atau saat debug produksi:
 
 ```http
 GET https://www.api.kakiempat.com/health.php
 GET https://www.api.kakiempat.com/admin_v2.php?action=agent_health&token=SECRET
 ```
 
-- Secret server: `.agent_telemetry_secret` (template: `.agent_telemetry_secret.example`) — **hanya di server**, jangan commit
+- Secret server: `.agent_telemetry_secret` — **hanya di server**, jangan commit
 - Metrics: booking hari ini, platform fee, DB status, disk
 
 ## Prioritas & batasan

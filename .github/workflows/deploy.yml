@@ -1,248 +1,74 @@
-# Deploy otomatis 6 domain Kaki Empat v2 — matrix paralel + path filter (delta only).
-# www + 4 subdomain Flutter (owner, sitter, admin, staging) + api (PHP).
-# FTP dari runner GitHub → docroot cPanel (bukan public_html/subfolder).
+# Deploy Kaki Empat v2 — Git Pull via cPanel (FTP/SFTP diblokir firewall).
+# Alur: build lokal -> git push -> workflow memicu cPanel VersionControl/update -> .cpanel.yml rsync.
 #
-# Secrets: FTP_SERVER, FTP_USERNAME, FTP_PASSWORD, FTP_PORT
+# Secrets: CPANEL_API_TOKEN, CPANEL_REPO_PATH (opsional)
 # Lihat .github/DEPLOY_SECRETS.md
 
-name: Automatic Multi-Domain Deploy (6 Domains)
+name: 🚀 Kaki Empat v2 Git-Pull Deployment (No-FTP Bypass)
 
 on:
   push:
     branches:
       - main
       - master
-    paths:
-      - 'lib/**'
-      - 'web/**'
-      - 'hosting/**'
-      - 'pubspec.yaml'
-      - 'pubspec.lock'
-      - 'assets/**'
-      - 'scripts/ci/**'
-      - '.github/workflows/deploy.yml'
+  workflow_dispatch:
 
 concurrency:
-  group: deploy-${{ github.workflow }}-${{ github.ref }}
+  group: cpanel-git-deploy-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 
 env:
-  API_BASE_URL: https://www.api.kakiempat.com
-  FLUTTER_VERSION: '3.41.9'
+  CPANEL_HOST: kakiempat.com
+  CPANEL_USER: kakiempa
+  CPANEL_REPO_PATH: /home/kakiempa/repo_kakiempat
 
 jobs:
-  changes:
-    name: Detect changed domains
-    runs-on: ubuntu-latest
-    outputs:
-      api: ${{ steps.filter.outputs.api }}
-      www: ${{ steps.filter.outputs.www }}
-      owner: ${{ steps.filter.outputs.owner }}
-      sitter: ${{ steps.filter.outputs.sitter }}
-      admin: ${{ steps.filter.outputs.admin }}
-      staging: ${{ steps.filter.outputs.staging }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Path filters per domain
-        uses: dorny/paths-filter@v3
-        id: filter
-        with:
-          filters: |
-            api:
-              - 'hosting/api.kakiempat.com/**'
-              - 'scripts/ci/prepare_api_package.sh'
-            www:
-              - 'lib/features/www/**'
-              - 'lib/core/**'
-              - 'web/**'
-              - 'hosting/web_shared/**'
-              - 'pubspec.yaml'
-              - 'pubspec.lock'
-              - 'assets/**'
-              - 'scripts/ci/prepare_web_package.sh'
-            owner:
-              - 'lib/features/owner/**'
-              - 'lib/core/**'
-              - 'web/**'
-              - 'hosting/web_shared/**'
-              - 'pubspec.yaml'
-              - 'pubspec.lock'
-              - 'assets/**'
-              - 'scripts/ci/prepare_web_package.sh'
-            sitter:
-              - 'lib/features/sitter/**'
-              - 'lib/core/**'
-              - 'web/**'
-              - 'hosting/web_shared/**'
-              - 'pubspec.yaml'
-              - 'pubspec.lock'
-              - 'assets/**'
-              - 'scripts/ci/prepare_web_package.sh'
-            admin:
-              - 'lib/features/admin/**'
-              - 'lib/core/**'
-              - 'web/**'
-              - 'hosting/web_shared/**'
-              - 'pubspec.yaml'
-              - 'pubspec.lock'
-              - 'assets/**'
-              - 'scripts/ci/prepare_web_package.sh'
-            staging:
-              - 'lib/features/owner/**'
-              - 'lib/core/**'
-              - 'web/**'
-              - 'hosting/web_shared/**'
-              - 'pubspec.yaml'
-              - 'pubspec.lock'
-              - 'assets/**'
-              - 'scripts/ci/prepare_web_package.sh'
-
-  build-web:
-    name: Flutter build web (shared)
-    needs: changes
-    if: |
-      needs.changes.outputs.www == 'true' ||
-      needs.changes.outputs.owner == 'true' ||
-      needs.changes.outputs.sitter == 'true' ||
-      needs.changes.outputs.admin == 'true' ||
-      needs.changes.outputs.staging == 'true'
+  trigger-cpanel:
+    name: ⚡ Trigger cPanel Auto Deployment
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: stable
-          cache: true
-
-      - name: flutter pub get
-        run: flutter pub get
-
-      - name: flutter analyze
-        run: flutter analyze
-
-      - name: flutter build web
+      - name: Validasi CPANEL_API_TOKEN
         run: |
-          flutter build web --release --tree-shake-icons \
-            --dart-define=API_BASE_URL=${{ env.API_BASE_URL }} \
-            --dart-define=CPANEL_MYSQL_HOST=localhost \
-            --dart-define=CPANEL_MYSQL_DATABASE=kakiempa_v2 \
-            --dart-define=CPANEL_MYSQL_USER=kakiempa_v2_user
+          if [[ -z "${{ secrets.CPANEL_API_TOKEN }}" ]]; then
+            echo "::error::Secret CPANEL_API_TOKEN belum diisi. Lihat .github/DEPLOY_SECRETS.md"
+            exit 1
+          fi
 
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: flutter-web
-          path: build/web/
-          retention-days: 1
-
-  matrix-deploy:
-    name: Deploy ${{ matrix.domain }}
-    needs: [changes, build-web]
-    if: always() && needs.changes.result == 'success' && (needs.build-web.result == 'success' || needs.build-web.result == 'skipped')
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - domain: api
-            kind: api
-            local_dir: build/deploy_api/
-            remote_dir: api.kakiempat.com/
-          - domain: www
-            kind: web
-            local_dir: build/deploy/www/web/
-            remote_dir: public_html/
-          - domain: owner
-            kind: web
-            local_dir: build/deploy/owner/web/
-            remote_dir: owner.kakiempat.com/
-          - domain: sitter
-            kind: web
-            local_dir: build/deploy/sitter/web/
-            remote_dir: sitter.kakiempat.com/
-          - domain: admin
-            kind: web
-            local_dir: build/deploy/admin/web/
-            remote_dir: admin.kakiempat.com/
-          - domain: staging
-            kind: web
-            local_dir: build/deploy/staging/web/
-            remote_dir: staging.kakiempat.com/
-
-    steps:
-      - name: Skip — tidak ada perubahan di domain ini
-        if: needs.changes.outputs[matrix.domain] != 'true'
-        run: echo "Skip ${{ matrix.domain }} (path filter: tidak ada delta)"
-
-      - name: Checkout
-        if: needs.changes.outputs[matrix.domain] == 'true'
-        uses: actions/checkout@v4
-
-      - name: Validasi FTP secrets
-        if: needs.changes.outputs[matrix.domain] == 'true'
-        run: |
-          for key in FTP_SERVER FTP_USERNAME FTP_PASSWORD FTP_PORT; do
-            if [[ -z "${!key:-}" ]]; then
-              echo "::error::Repository secret $key belum diisi. Lihat .github/DEPLOY_SECRETS.md"
-              exit 1
-            fi
-          done
+      - name: 🌐 Pull & deploy via cPanel VersionControl API
         env:
-          FTP_SERVER: ${{ secrets.FTP_SERVER }}
-          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
-          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
-          FTP_PORT: ${{ secrets.FTP_PORT }}
+          CPANEL_TOKEN: ${{ secrets.CPANEL_API_TOKEN }}
+          REPO_PATH_SECRET: ${{ secrets.CPANEL_REPO_PATH }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          REPO_PATH="${REPO_PATH_SECRET:-/home/kakiempa/repo_kakiempat}"
+          encoded_repo=$(python3 -c "import urllib.parse; print(urllib.parse.quote('''$REPO_PATH'''))")
+          encoded_branch=$(python3 -c "import urllib.parse; print(urllib.parse.quote('''$BRANCH'''))")
+          url="https://${{ env.CPANEL_HOST }}:2083/execute/VersionControl/update"
+          query="repository_root=${encoded_repo}&branch=${encoded_branch}"
 
-      - name: Download Flutter web artifact
-        if: needs.changes.outputs[matrix.domain] == 'true' && matrix.kind == 'web'
-        uses: actions/download-artifact@v4
-        with:
-          name: flutter-web
-          path: build/web
+          echo "Memicu git pull + .cpanel.yml di $REPO_PATH (branch=$BRANCH)"
+          http_code=$(curl -sS -o /tmp/cpanel_response.json -w "%{http_code}" \
+            -H "Authorization: cpanel ${{ env.CPANEL_USER }}:${CPANEL_TOKEN}" \
+            -H "Accept: application/json" \
+            "${url}?${query}" || echo "000")
 
-      - name: Paket API
-        if: needs.changes.outputs[matrix.domain] == 'true' && matrix.kind == 'api'
-        run: bash scripts/ci/prepare_api_package.sh
+          echo "cPanel API HTTP $http_code"
+          cat /tmp/cpanel_response.json
 
-      - name: Paket web per subdomain
-        if: needs.changes.outputs[matrix.domain] == 'true' && matrix.kind == 'web'
-        run: bash scripts/ci/prepare_web_package.sh "${{ matrix.domain }}"
+          if [[ "$http_code" != "200" ]]; then
+            echo "::error::cPanel VersionControl/update gagal (HTTP $http_code)"
+            exit 1
+          fi
 
-      - name: Deploy via FTP (delta sync)
-        if: needs.changes.outputs[matrix.domain] == 'true'
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.6
-        with:
-          server: ${{ secrets.FTP_SERVER }}
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          port: ${{ secrets.FTP_PORT }}
-          protocol: ftp
-          local-dir: ./${{ matrix.local_dir }}
-          server-dir: ${{ matrix.remote_dir }}
-          log-level: standard
-          timeout: 600000
-          exclude: |
-            **/.git*
-            **/.git*/**
-            **/node_modules/**
-            **/.mysql_v2.php
-            **/.migrate_v2_secret
-            **/.agent_telemetry_secret
-            **/.payment_webhook_secret
-            **/.payment_config.php
-            **/.notifications_path.php
-            uploads/**
-            backups/**
+          if ! grep -q '"status":1' /tmp/cpanel_response.json; then
+            echo "::error::cPanel API mengembalikan status gagal"
+            exit 1
+          fi
 
       - name: Verifikasi API health
-        if: needs.changes.outputs[matrix.domain] == 'true' && matrix.domain == 'api'
         run: |
+          echo "Menunggu deploy .cpanel.yml selesai..."
+          sleep 20
           for url in \
             "https://www.api.kakiempat.com/health.php" \
             "https://api.kakiempat.com/health.php"; do
@@ -253,8 +79,7 @@ jobs:
               exit 0
             fi
           done
-          echo "::warning::Health check gagal — deploy FTP selesai, cek server manual."
+          echo "::warning::Health check gagal — cek log deploy di cPanel Git Version Control."
 
-      - name: Ringkasan deploy
-        if: needs.changes.outputs[matrix.domain] == 'true'
-        run: echo "OK ${{ matrix.domain }} -> ${{ matrix.remote_dir }}"
+      - name: Ringkasan
+        run: echo "Deploy via cPanel git pull selesai. Subdomain web mengikuti artefak di build/deploy/*/web/"

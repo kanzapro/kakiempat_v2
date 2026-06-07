@@ -1,5 +1,4 @@
-# Selesaikan deploy release_v2 setelah IP di-whitelist Imunify360.
-# Prioritas: PHP extract server-side (cepat), fallback FTP per-file.
+# Selesaikan deploy release_v2 — server-side extract atau git push.
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 $credPath = Join-Path $root '.cursor\secrets\hosting.credentials'
@@ -21,13 +20,6 @@ foreach ($k in @('deploy_secret', 'media_secret')) {
     if ($v) { $secret = $v; break }
 }
 
-if (-not $secret) {
-    Write-Host 'Coba extract via secret di server (.kakiempat_media_secret)...'
-    $user = Get-IniValue $ini 'cpanel' 'username'
-    $pass = Get-IniValue $ini 'cpanel' 'password'
-    $secret = (curl.exe -sS --ftp-pasv -u "${user}:${pass}" 'ftp://ftp.kakiempat.com/public_html/api/.kakiempat_media_secret' 2>$null).Trim()
-}
-
 if ($secret) {
     Write-Host 'Trigger deploy-release-v2-all-extract.php ...'
     $urls = @(
@@ -44,5 +36,6 @@ if ($secret) {
     }
 }
 
-Write-Host 'Fallback: scripts/deploy_release_zip_all.ps1' -ForegroundColor Yellow
-& (Join-Path $root 'scripts\deploy_release_zip_all.ps1')
+Write-Host 'Fallback: deploy_git.ps1 + git push (FTP diblokir)' -ForegroundColor Yellow
+& (Join-Path $root 'scripts\deploy_git.ps1') -Layer all -WebRenderer html
+Write-Host 'Lanjut: git add build/deploy build/deploy_api && git commit && git push origin main'

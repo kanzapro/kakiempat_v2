@@ -7,4 +7,10 @@ Aturan lengkap deploy, GitHub Actions, diagnostik, dan arsitektur ada di:
 - `.cursor/rules/deploy-workflow.mdc`
 - `.cursor/rules/hosting-cpanel-access.mdc`
 
-Prioritas: Money Engine (`owner_v2.php`) stabil. Deploy via git push + GitHub Actions, bukan FTP manual.
+Prioritas: Money Engine (`owner_v2.php`) stabil.
+
+## Multi-Domain Deployment — FTP BLOCKED BYPASS
+
+- Protokol FTP/SFTP diblokir oleh hosting. **Jangan pernah** menulis kode skrip deploy berbasis FTP.
+- Alur deploy wajib: `.\scripts\deploy_git.ps1` (build lokal) → `git push` → GitHub Actions memicu cPanel `VersionControl/update` → `.cpanel.yml` rsync ke 6 docroot.
+- Jika deploy gagal, ingatkan pengguna untuk memeriksa `CPANEL_API_TOKEN` di GitHub Secrets dan repo path di cPanel Git Version Control (`/home/kakiempa/repo_kakiempat`).

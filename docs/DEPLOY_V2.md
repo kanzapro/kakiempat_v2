@@ -11,7 +11,7 @@ Panduan rilis production: Flutter web (6 subdomain) + API PHP self-hosted di cPa
 
 | Item | Lokasi |
 |------|--------|
-| Kredensial cPanel / FTP | `.cursor/secrets/hosting.credentials` (salin dari `.example`) |
+| Kredensial cPanel + API token | `.cursor/secrets/hosting.credentials` (salin dari `.example`) |
 | Env lokal (opsional) | `.env` dari `.env.example` |
 | Flutter SDK | 3.11+ |
 | PowerShell | Windows (skrip deploy) |
@@ -72,21 +72,31 @@ build/deploy_api/             # Upload ke api.kakiempat.com
 | `staging.kakiempat.com` | `staging.kakiempat.com` | (opsional, sama isi build) |
 | `api.kakiempat.com` | `api.kakiempat.com` | `build/deploy_api/*` |
 
-### 3.2 Langkah manual (File Manager / FTP)
+### 3.2 Deploy otomatis (Git → cPanel, tanpa FTP)
 
-**Frontend (per subdomain):**
+FTP/SFTP diblokir firewall. Gunakan **cPanel Git™ Version Control** + `.cpanel.yml`.
 
-1. Login cPanel → File Manager
-2. Buka docroot subdomain (mis. `owner.kakiempat.com`)
-3. Upload ZIP (`owner-deploy.zip`)
-4. Extract → isi file (`index.html`, `main.dart.js`, `assets/`, …) harus di **root** docroot, bukan dalam subfolder ZIP
-5. Ulangi untuk www, sitter, admin
+```powershell
+# Build + paket semua domain
+.\scripts\deploy_git.ps1 -Layer all -WebRenderer html
 
-**API:**
+# Commit artefak + push
+git add build/deploy build/deploy_api hosting/
+git commit -m "deploy: <deskripsi>"
+git push origin main
+```
 
-1. Upload isi `build/deploy_api/` ke `api.kakiempat.com`
-2. Pastikan `schema/mysql/` ikut ter-upload
-3. Buat file secret di server (jangan commit):
+GitHub Actions memicu `VersionControl/update` → server git pull → `scripts/ci/cpanel_deploy.sh` rsync ke docroot.
+
+Setup sekali: lihat `.github/DEPLOY_SECRETS.md` (API token + repo path `/home/kakiempa/repo_kakiempat`).
+
+### 3.3 Darurat manual (File Manager)
+
+Jika git deploy gagal, ekstrak ZIP dari `build/release_v2/` ke docroot via File Manager.
+
+**API manual:** upload isi `build/deploy_api/` ke `api.kakiempat.com`. Pastikan `schema/mysql/` ikut.
+
+File secret di server (jangan commit):
 
 | File server | Isi |
 |-------------|-----|
@@ -97,20 +107,13 @@ build/deploy_api/             # Upload ke api.kakiempat.com
 
 Template MySQL: salin dari `[mysql_v2]` di `hosting.credentials`.
 
-### 3.3 Otomatis (FTP / UAPI)
+### 3.4 Picu deploy manual dari laptop
 
 ```powershell
-# FTP — API + semua subdomain web
-.\scripts\deploy_release_v2.ps1 -Target all
-
-# Hanya API
-.\scripts\deploy_via_ftp.ps1 -Target api
-
-# cPanel UAPI extract (butuh credentials)
-.\scripts\deploy_web_cpanel.ps1 -SkipBuild
+.\scripts\trigger_cpanel_deploy.ps1
 ```
 
-Kredensial FTP: `[cpanel]` di `hosting.credentials`, host `ftp.kakiempat.com`.
+Butuh `CPANEL_API_TOKEN` (env) atau `cpanel.api_token` di `hosting.credentials`.
 
 ---
 

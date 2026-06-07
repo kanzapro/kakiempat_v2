@@ -39,9 +39,10 @@ Gunakan section `[mysql_v2]` untuk:
 | Tugas | Referensi |
 |--------|-----------|
 | Paket API lokal | `scripts/deploy_api.ps1` → `build/deploy_api` |
-| Upload API FTP | `scripts/deploy_via_ftp.ps1 -Target api` |
-| Owner BFF saja | `scripts/deploy_api_owner.ps1 -Upload` (lihat rule `deploy-workflow`) |
+| Deploy git (no FTP) | `scripts/deploy_git.ps1` → commit → `git push` |
+| Owner BFF saja | `scripts/deploy_api_owner.ps1` (lihat rule `deploy-workflow`) |
 | Build Flutter web | `scripts/deploy_web.ps1 -WebRenderer html -Target owner` |
+| Picu cPanel manual | `scripts/trigger_cpanel_deploy.ps1` |
 | Docroot API | `api_deploy.docroot` |
 | Cek API hidup | `curl` ke `api_deploy.health_url` |
 | Migrasi SQL | `api_deploy.migrate_url?secret=...&file=001_core_tables.sql` |

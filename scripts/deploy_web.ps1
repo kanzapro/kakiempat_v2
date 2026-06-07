@@ -8,7 +8,6 @@ param(
     [switch]$All,
     [switch]$SkipBuild,
     [switch]$SkipAnalyze,
-    [switch]$Upload,
     [switch]$NoZip,
     [string]$ApiBaseUrl = 'https://www.api.kakiempat.com'
 )
@@ -17,8 +16,6 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 Set-Location $root
 . (Join-Path $root 'scripts\lib\web_seo.ps1')
-. (Join-Path $root 'scripts\lib\winscp_sync.ps1')
-$scriptLib = Join-Path $root 'scripts\lib'
 
 $targets = [ordered]@{
     owner   = @{ docroot = 'owner.kakiempat.com';   url = 'https://owner.kakiempat.com';   zip = 'owner-deploy.zip' }
@@ -88,46 +85,6 @@ function New-DeployPackage([string]$name, [hashtable]$meta, [string]$webRoot, [s
     return @{ deployRoot = $deployRoot; webRoot = $targetWebRoot }
 }
 
-function Invoke-WinScpUpload([string]$name, [string]$webRoot) {
-    $credPath = Join-Path $root '.cursor\secrets\hosting.credentials'
-    if (-not (Test-Path $credPath)) {
-        throw "Upload membutuhkan $credPath - salin dari hosting.credentials.example"
-    }
-    function Get-IniValue($text, $section, $key) {
-        $in = $false
-        foreach ($line in $text -split "`n") {
-            $t = $line.Trim()
-            if ($t -match '^\[(.+)\]$') { $in = ($Matches[1] -eq $section); continue }
-            if ($in -and $t -match "^$key=(.*)$") { return $Matches[1].Trim() }
-        }
-        return $null
-    }
-    $ini = Get-Content $credPath -Raw
-    $user = Get-IniValue $ini 'cpanel' 'username'
-    $pass = Get-IniValue $ini 'cpanel' 'password'
-    $primary = Get-IniValue $ini 'cpanel' 'primary_domain'
-    $sharedIp = Get-IniValue $ini 'cpanel' 'shared_ip'
-    if (-not $user -or -not $pass) { throw 'cpanel.username / cpanel.password tidak ditemukan di hosting.credentials' }
-
-    $ftpHosts = @(
-        $(if ($sharedIp) { $sharedIp }),
-        'ftp.kakiempat.com',
-        $(if ($primary) { $primary })
-    ) | Where-Object { $_ } | Select-Object -Unique
-
-    $remoteDocroot = $targets[$name].docroot
-    $fileCount = (Get-ChildItem $webRoot -Recurse -File).Count
-    Write-Host "WinSCP sync $name -> $remoteDocroot ($fileCount file lokal, hosts: $($ftpHosts -join ', '))"
-
-    Invoke-WinScpSyncLocalToRemote `
-        -LocalPath $webRoot `
-        -RemotePath $remoteDocroot `
-        -UserName $user `
-        -Password $pass `
-        -HostNames $ftpHosts `
-        -LibRoot $scriptLib
-}
-
 $buildTargets = if ($All) { @($targets.Keys) } else { @($Target) }
 
 Write-Host '=== Kaki Empat v2 - deploy web ===' -ForegroundColor Cyan
@@ -168,18 +125,11 @@ if (-not (Test-Path $webRoot)) { throw "Tidak ada $webRoot - jalankan build dulu
 Write-Host ''
 Write-Host 'Packaging per subdomain (SEO per target) ...'
 foreach ($t in $buildTargets) {
-    if ($Upload -and $SkipBuild) {
-        # Hindari file lock saat build/web masih dipakai proses lain.
-        $NoZip = $true
-    }
-    $pkg = New-DeployPackage -name $t -meta $targets[$t] -webRoot $webRoot -webRenderer $WebRenderer
-    if ($Upload) {
-        Invoke-WinScpUpload -name $t -webRoot $pkg.webRoot
-    }
+    New-DeployPackage -name $t -meta $targets[$t] -webRoot $webRoot -webRenderer $WebRenderer | Out-Null
 }
 
 Write-Host ''
-Write-Host 'Selesai. Upload ZIP ke docroot cPanel (extract isi ke root subdomain).' -ForegroundColor Cyan
+Write-Host 'Selesai. Commit build/deploy/* lalu git push — cPanel git pull (.cpanel.yml) akan rsync ke docroot.' -ForegroundColor Cyan
 Write-Host '  owner   -> owner.kakiempat.com   (money engine)'
 Write-Host '  sitter  -> sitter.kakiempat.com'
 Write-Host '  admin   -> admin.kakiempat.com'
@@ -189,6 +139,6 @@ Write-Host ''
 Write-Host 'Contoh:'
 Write-Host '  .\scripts\deploy_web.ps1 -Target owner -WebRenderer html'
 Write-Host '  .\scripts\deploy_web.ps1 -All -SkipAnalyze -WebRenderer html'
-Write-Host '  .\scripts\deploy_web.ps1 -Target owner -WebRenderer html -Upload'
-Write-Host '  .\scripts\deploy_api_owner.ps1 -Upload   # hanya owner_v2.php (BFF parsial)'
-Write-Host '  .\scripts\deploy_owner.ps1 -Layer both -WebRenderer html -Upload   # money engine'
+Write-Host '  .\scripts\deploy_git.ps1 -Layer all -WebRenderer html'
+Write-Host '  .\scripts\deploy_owner.ps1 -Layer both -WebRenderer html'
+Write-Host '  git add build/deploy build/deploy_api && git commit && git push origin main'

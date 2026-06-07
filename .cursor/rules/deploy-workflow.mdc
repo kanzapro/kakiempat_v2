@@ -7,58 +7,55 @@ alwaysApply: true
 
 ## Larangan
 
-- **Jangan** menyalin/mengunggah file PHP atau web satu per satu lewat terminal manual (`curl -T` per file, `scp` ad-hoc, copy-paste FTP).
-- **Jangan** mengunggah ke `/public_html/api/` — docroot API adalah **`api.kakiempat.com`** (lihat `deploy_via_ftp.ps1`).
+- **FTP/SFTP diblokir** — jangan menulis atau memanggil skrip upload FTP/WinSCP.
+- **Jangan** menyalin file PHP/web satu per satu lewat terminal manual ke server.
+- **Jangan** mengunggah ke `/public_html/api/` — docroot API adalah **`api.kakiempat.com`**.
 
-## Backend PHP — selalu pakai skrip
+## Alur deploy (wajib)
+
+```
+deploy_git.ps1 (lokal) → git push → GitHub Actions → cPanel git pull → .cpanel.yml
+```
 
 | Scope perubahan | Perintah |
 |-----------------|----------|
-| API penuh | `.\scripts\deploy_api.ps1` lalu `.\scripts\deploy_via_ftp.ps1 -Target api` |
-| **Hanya BFF Owner (money engine)** | `.\scripts\deploy_api_owner.ps1 -Upload` |
-| **Owner web + API sekaligus** | `.\scripts\deploy_owner.ps1 -Layer both -WebRenderer html -Upload` |
-| Web + API semua subdomain | `.\scripts\deploy_via_ftp.ps1 -Target all` |
+| Semua domain | `.\scripts\deploy_git.ps1 -Layer all -WebRenderer html` |
+| API penuh | `.\scripts\deploy_git.ps1 -Layer api` |
+| Web satu subdomain | `.\scripts\deploy_git.ps1 -Layer web -Target owner -WebRenderer html` |
+| **Owner web + BFF** | `.\scripts\deploy_owner.ps1 -Layer both -WebRenderer html` |
+| Picu cPanel manual | `.\scripts\trigger_cpanel_deploy.ps1` |
 
-**Owner-only backend** — deploy hanya jika diff terbatas pada:
+**Owner-only backend** — jika diff terbatas pada:
 
 - `hosting/api.kakiempat.com/owner_v2.php`
 - `hosting/api.kakiempat.com/lib/kakiempat_owner_v2.php`
 
-Jika juga berubah `pet_v2.php`, `service_v2.php`, `booking_v2.php`, `marketplace_v2.php`, atau `admin_v2.php` → gunakan deploy API penuh.
+Jika juga berubah `pet_v2.php`, `service_v2.php`, `booking_v2.php`, `marketplace_v2.php`, atau `admin_v2.php` → `deploy_git.ps1 -Layer api`.
 
 Kredensial: `.cursor/secrets/hosting.credentials` (`[cpanel]`). Jangan minta password ke user jika file ada.
 
 ## Flutter web per subdomain
 
-Selalu lewat `.\scripts\deploy_web.ps1` dengan **`-WebRenderer`** eksplisit:
+Selalu lewat `.\scripts\deploy_web.ps1` atau `deploy_git.ps1` dengan **`-WebRenderer`** eksplisit:
 
 | Renderer | Kapan | Ukuran bundle |
 |----------|-------|----------------|
 | `html` (default) | Owner/sitter dashboard, form, list | Paling kecil — dart2js tanpa `--wasm` |
-| `canvaskit` | Butuh rendering Skia konsisten (jarang) | Lebih besar — pakai hanya jika UI membutuhkan |
-| `skwasm` | Eksperimen WASM | `--wasm`; ukuran berbeda |
+| `canvaskit` | Butuh rendering Skia konsisten (jarang) | Lebih besar |
+| `skwasm` | Eksperimen WASM | `--wasm` |
 
-Contoh money engine (owner):
+Contoh money engine:
 
 ```powershell
-.\scripts\deploy_web.ps1 -Target owner -WebRenderer html -Upload
+.\scripts\deploy_git.ps1 -Layer web -Target owner -WebRenderer html
+git add build/deploy/owner build/deploy_api
+git commit -m "deploy: owner web"
+git push origin main
 ```
-
-**Owner-only frontend** — jika perubahan hanya di `lib/features/owner/**`:
-
-- Build tetap satu kali (Flutter tidak mendukung compile parsial per folder).
-- Upload **hanya** subdomain owner: `-Target owner` (bukan `-All`).
-- Wajib `-WebRenderer html` (default) — folder `canvaskit/` dihapus dari paket deploy untuk memangkas ukuran upload.
-
-Subdomain lain: ganti `-Target` (`sitter`, `admin`, `www`, `staging`).
 
 ## Verifikasi setelah deploy
 
-- API: `curl` ke `[api_deploy].health_url` / `index.php`
+- API: `curl` ke `[api_deploy].health_url` / `health.php`
 - Owner: buka `https://owner.kakiempat.com` + smoke login SSO
-- Migrasi SQL: `apply_v2_migration.php` via skrip, bukan upload manual ke phpMyAdmin kecuali darurat
-
-## FTP IDE (opsional)
-
-Generate config dari kredensial: `.\scripts\generate_ftp_config.ps1`  
-Template: `.vscode/ftp-config.example.json` — jangan commit `ftp.json`.
+- cPanel: Git Version Control → log deploy `.cpanel.yml`
+- Migrasi SQL: `apply_v2_migration.php` via skrip, bukan phpMyAdmin kecuali darurat

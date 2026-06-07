@@ -35,5 +35,5 @@ $bytes = (Get-Item $sql).Length
 if ($bytes -lt 2048) { throw "001_core_tables.sql terlalu kecil ($bytes bytes)" }
 
 Write-Host "Paket API: $dest ($bytes bytes SQL)"
-Write-Host 'Upload ke docroot api.kakiempat.com (wajib schema/mysql/001_core_tables.sql).'
+Write-Host 'Commit build/deploy_api/ lalu git push — .cpanel.yml rsync ke api.kakiempat.com (wajib schema/mysql/).'
 Write-Host 'Server: .mysql_v2.php + .migrate_v2_secret. Lalu scripts/run_v2_migration.ps1'

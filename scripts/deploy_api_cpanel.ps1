@@ -1,4 +1,4 @@
-# Upload build/deploy_api ke docroot via cPanel UAPI (fallback jika FTP diblokir).
+# Upload build/deploy_api ke docroot via cPanel UAPI (darurat — prefer deploy_git.ps1 + git push).
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 

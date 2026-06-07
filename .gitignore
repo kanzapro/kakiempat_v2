@@ -31,6 +31,10 @@ migrate_working_dir/
 .pub-cache/
 .pub/
 /build/
+!/build/deploy/
+!/build/deploy/**
+!/build/deploy_api/
+!/build/deploy_api/**
 /coverage/
 
 # Symbolication related

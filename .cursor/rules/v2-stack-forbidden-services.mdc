@@ -20,7 +20,7 @@ Flutter web (6 subdomain) → api.kakiempat.com (PHP) → MySQL kakiempa_v2
 | DB | MySQL v2, migrasi `schema/mysql/` | `[mysql_v2]` di `hosting.credentials` |
 | Auth | Session/token via `auth_v2.php` | `lib/core/services/*_v2_service.dart` |
 | Notifikasi | **Polling DB** ke `notification_v2.php` + overlay | `LocalNotificationHandler` |
-| Deploy | `scripts/deploy_api.ps1`, `deploy_web.ps1`, `deploy_via_ftp.ps1` | rule `hosting-cpanel-access` |
+| Deploy | `scripts/deploy_git.ps1`, `deploy_api.ps1`, `deploy_web.ps1` | rule `hosting-cpanel-access` |
 
 ## Larangan keras — jangan tambahkan
 
