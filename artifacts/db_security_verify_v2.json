@@ -1,0 +1,19 @@
+﻿{
+    "api_base":  "https://api.kakiempat.com",
+    "checked_at":  "2026-06-07T05:41:43.1252758Z",
+    "warnings":  [
+
+                 ],
+    "checks":  {
+                   "htaccess_https":  true,
+                   "health_no_secret_leak":  true,
+                   "sensitive_files_denied":  true,
+                   "health_ok":  true,
+                   "htaccess_denies_mysql":  true,
+                   "pdo_localhost_guard":  true,
+                   "security_migration_present":  true,
+                   "cors_https_only_prod":  true,
+                   "pdo_native_prepares":  true,
+                   "mysql_example_localhost":  true
+               }
+}

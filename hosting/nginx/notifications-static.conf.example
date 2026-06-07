@@ -1,0 +1,14 @@
+# Nginx — serve file notifikasi statis (opsional, ringan untuk RAM 4GB)
+# Letakkan di server block api.kakiempat.com atau www sesuai deploy Anda.
+
+location /notifications/ {
+    alias /var/www/kakiempat/uploads/notifications/;
+    add_header Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0";
+    types {
+        application/json json;
+    }
+    default_type application/json;
+}
+
+# Flutter tetap polling ke get_notifications.php (auth + mark_read).
+# cPanel: uploads/notifications/ di docroot api.kakiempat.com

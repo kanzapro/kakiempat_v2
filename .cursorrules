@@ -1,0 +1,10 @@
+# Kaki Empat v2 — Agent Rules
+
+Aturan lengkap deploy, GitHub Actions, diagnostik, dan arsitektur ada di:
+
+- `.cursor/rules/agent-deploy-automation.mdc` (always apply — semua agen)
+- `.cursor/rules/v2-stack-forbidden-services.mdc`
+- `.cursor/rules/deploy-workflow.mdc`
+- `.cursor/rules/hosting-cpanel-access.mdc`
+
+Prioritas: Money Engine (`owner_v2.php`) stabil. Deploy via git push + GitHub Actions, bukan FTP manual.

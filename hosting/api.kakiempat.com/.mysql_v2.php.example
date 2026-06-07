@@ -1,0 +1,16 @@
+<?php
+/**
+ * Salin ke .mysql_v2.php di docroot api.kakiempat.com — jangan commit.
+ *
+ * Keamanan:
+ * - host WAJIB localhost (API & MySQL satu server cPanel)
+ * - user khusus kakiempa_v2_user, hak SELECT/INSERT/UPDATE/DELETE saja
+ * - Lihat schema/mysql/020_db_access_hardening.sql untuk GRANT minimal
+ */
+return [
+    'host' => 'localhost',
+    'db' => 'kakiempa_v2',
+    'user' => 'kakiempa_v2_user',
+    'pass' => 'GANTI_PASSWORD_KUAT_MIN_16_KARAKTER',
+    'port' => 3306,
+];

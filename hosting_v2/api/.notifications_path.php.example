@@ -1,0 +1,6 @@
+<?php
+/** Salin ke .notifications_path.php jika path kustom (VPS). Default: uploads/notifications di docroot API. */
+return [
+    // Contoh VPS: '/var/www/kakiempat/uploads/notifications'
+    'path' => null,
+];

@@ -1,0 +1,84 @@
+# Super Charge — deploy backend PHP delta ke api.kakiempat.com (bukan public_html/api/).
+# Trigger: push main/master saat BFF / katalog layanan berubah.
+# Secrets: FTP_SERVER, FTP_USERNAME, FTP_PASSWORD, FTP_PORT
+
+name: Super Charge Kaki Empat v2 Deploy
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - 'hosting/api.kakiempat.com/**'
+      - '.github/workflows/deploy.yml'
+      - 'scripts/ci/prepare_api_package.sh'
+
+concurrency:
+  group: deploy-backend-production
+  cancel-in-progress: false
+
+jobs:
+  deploy-backend:
+    name: Fast Deploy Backend to Server
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get latest code
+        uses: actions/checkout@v4
+
+      - name: Validasi FTP secrets
+        run: |
+          for key in FTP_SERVER FTP_USERNAME FTP_PASSWORD FTP_PORT; do
+            if [[ -z "${!key:-}" ]]; then
+              echo "::error::Repository secret $key belum diisi."
+              exit 1
+            fi
+          done
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_PORT: ${{ secrets.FTP_PORT }}
+
+      - name: Paket backend PHP (tanpa rahasia server)
+        run: bash scripts/ci/prepare_api_package.sh
+
+      - name: Smart FTP deploy (delta only)
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.6
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          port: ${{ secrets.FTP_PORT }}
+          protocol: ftp
+          local-dir: ./build/deploy_api/
+          server-dir: api.kakiempat.com/
+          log-level: standard
+          timeout: 600000
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/node_modules/**
+            **/.mysql_v2.php
+            **/.migrate_v2_secret
+            **/.agent_telemetry_secret
+            **/.payment_webhook_secret
+            **/.payment_config.php
+            **/.notifications_path.php
+            uploads/**
+            backups/**
+
+      - name: Verifikasi health endpoint
+        run: |
+          for url in \
+            "https://www.api.kakiempat.com/health.php" \
+            "https://api.kakiempat.com/health.php"; do
+            code=$(curl -sS -o /tmp/health.json -w "%{http_code}" --max-time 30 "$url" || echo "000")
+            echo "$url -> HTTP $code"
+            if [[ "$code" == "200" ]]; then
+              cat /tmp/health.json
+              exit 0
+            fi
+          done
+          echo "::warning::Health check gagal — deploy FTP selesai, cek server manual."
+          exit 0

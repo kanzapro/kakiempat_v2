@@ -1,0 +1,67 @@
+---
+description: Stack v2 Kaki Empat — wajib self-hosted; larangan Firebase/BaaS & pola notifikasi
+alwaysApply: true
+---
+
+# Stack v2 — jangan melenceng
+
+Proyek ini **sudah lengkap** dengan arsitektur self-hosted. Agen **wajib** mengikuti stack di bawah dan **tidak** menambah layanan pihak ketiga tanpa permintaan eksplisit user.
+
+## Stack resmi (satu-satunya yang benar)
+
+```
+Flutter web (6 subdomain) → api.kakiempat.com (PHP) → MySQL kakiempa_v2
+```
+
+| Lapisan | Implementasi | Referensi |
+|---------|--------------|-----------|
+| Frontend | Flutter web, routing per hostname | `lib/core/web/domain_router.dart` |
+| API | PHP `*_v2.php`, JSON `{ok, data}` / `{ok, error, message}` | `hosting/api.kakiempat.com/` |
+| DB | MySQL v2, migrasi `schema/mysql/` | `[mysql_v2]` di `hosting.credentials` |
+| Auth | Session/token via `auth_v2.php` | `lib/core/services/*_v2_service.dart` |
+| Notifikasi | **Polling DB** ke `notification_v2.php` + overlay | `LocalNotificationHandler` |
+| Deploy | `scripts/deploy_api.ps1`, `deploy_web.ps1`, `deploy_via_ftp.ps1` | rule `hosting-cpanel-access` |
+
+## Larangan keras — jangan tambahkan
+
+Tanpa permintaan **eksplisit** user, **dilarang**:
+
+- `firebase_core`, `firebase_messaging`, FCM, Firebase Auth, Firestore, Realtime DB
+- Supabase, Appwrite, Parse, AWS Amplify, atau BaaS sejenis
+- Push notification pihak ketiga (OneSignal, Pusher Beams, dll.)
+- Mengganti auth/notifikasi/chat ke layanan eksternal
+
+**Alasan:** schema & API v2 sudah dirancang *in-app polling, tanpa email/WhatsApp/FCM* (`009_in_app_notifications.sql`).
+
+## Jika user minta "notifikasi" / "push" / "real-time"
+
+Gunakan yang **sudah ada** — jangan buat stack baru:
+
+1. Perbaiki polling `NotificationV2Service` / `LocalNotificationHandler` (interval, badge, mark-read)
+2. Perluas endpoint `notification_v2.php` di server jika kurang
+3. WebSocket/SSE **hanya** ke `api.kakiempat.com` sendiri — bukan Firebase
+
+## Sebelum menambah dependency baru
+
+Cek dulu:
+
+1. Apakah fitur sudah ada di `hosting/api.kakiempat.com/*.php` atau `lib/core/services/*_v2*.dart`?
+2. Apakah `pubspec.yaml` / `hosting/` sudah punya solusi setara?
+3. Jika ya → **perluas yang ada**, jangan parallel stack.
+
+## Contoh salah vs benar
+
+```
+❌ Tambah firebase_messaging untuk FCM push
+❌ Buat push_notification_service.dart + firebase_options.dart
+❌ Auth via Firebase Phone Auth
+
+✅ Poll notification_v2.php setiap N detik + overlay_support
+✅ Endpoint baru di PHP + service Dart yang match pola v2
+✅ Dark mode / UI polish tanpa backend baru
+```
+
+## Audit cepat sebelum commit
+
+- `grep -i firebase` di `lib/`, `pubspec.yaml`, `android/`, `ios/` → **harus nol**
+- Tidak ada file `google-services.json`, `GoogleService-Info.plist`, `firebase_options.dart`

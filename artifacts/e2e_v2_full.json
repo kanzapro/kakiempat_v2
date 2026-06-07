@@ -1,0 +1,155 @@
+﻿{
+    "run_at":  "2026-06-06T08:17:16.2232069Z",
+    "api_base":  "https://api.kakiempat.com",
+    "user_agent":  "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:128.0) Gecko/20100101 Firefox/128.0",
+    "owner_phone":  "628179086540",
+    "sitter_phone":  "628279086540",
+    "ids":  {
+                "sitter_user_id":  42,
+                "owner_user_id":  41,
+                "request_id":  "15",
+                "pet_id":  "14",
+                "booking_id":  "15",
+                "offer_id":  "13",
+                "withdrawal_id":  "11"
+            },
+    "summary":  "15/15 steps passed",
+    "passed":  15,
+    "total":  15,
+    "steps":  [
+                  {
+                      "step":  1,
+                      "name":  "register_owner",
+                      "status":  "ok",
+                      "success":  true,
+                      "http_status":  201,
+                      "response_snippet":  "{\"ok\":true,\"token\":\"native_372993185d5e2c58b7df35117a203ba321123046233aeb494ded2c4dd5c8a31c\",\"user\":{\"id\":41,\"phone\":\"628179086540\",\"role\":\"owner\",\"name\":\"E2E Owner\"},\"refresh_token\":\"refresh_27e27292d12c0580b8bc4b7b58001fe7967a78f27c2db64766d8ae050aac343c\"}"
+                  },
+                  {
+                      "step":  2,
+                      "name":  "register_sitter",
+                      "status":  "ok",
+                      "success":  true,
+                      "http_status":  201,
+                      "response_snippet":  "{\"ok\":true,\"token\":\"native_1f8731a7f400f97533701dec9fcda875827516f59b5f1c4db5cb5db4a0930b67\",\"user\":{\"id\":42,\"phone\":\"628279086540\",\"role\":\"sitter\",\"name\":\"E2E Sitter\"},\"refresh_token\":\"refresh_3d3da6b16cca324f37e52eff2e25ad4149e9def735bcf090cf9c49a9db26efec\"}"
+                  },
+                  {
+                      "step":  3,
+                      "name":  "sitter_save_profile_submit_verification",
+                      "status":  "ok",
+                      "success":  true,
+                      "http_status":  200,
+                      "response_snippet":  "{\"ok\":true,\"data\":{\"profile\":{\"bio\":\"E2E sitter\",\"address\":\"Jl Sitter E2E Jakarta\",\"latitude\":-6.2,\"longitude\":106.8,\"status\":\"draft\",\"submitted_at\":null},\"services\":[\"dog_walking\"],\"onboarding_complete\":false,\"needs_onboarding\":true}} | {\"ok\":true,\"data\":{\"message\":\"Profil dikirim untuk verifikasi. Tim Kaki Empat akan meninjau segera.\",\"status\":\"pending_verification\"}}",
+                      "sitter_user_id":  42
+                  },
+                  {
+                      "step":  4,
+                      "name":  "admin_approve_sitter",
+                      "status":  "ok",
+                      "success":  true,
+                      "http_status":  200,
+                      "response_snippet":  "{\"ok\":true,\"data\":{\"sitter_id\":\"42\",\"status\":\"approved\",\"message\":\"Pengasuh disetujui.\"}}",
+                      "sitter_user_id":  42
+                  },
+                  {
+                      "step":  5,
+                      "name":  "owner_add_pet_save_profile",
+                      "status":  "ok",
+                      "success":  true,
+                      "http_status":  200,
+                      "response_snippet":  "{\"ok\":true,\"data\":{\"pet\":{\"id\":\"14\",\"name\":\"Buddy\",\"species\":\"dog\",\"breed\":\"Mix\",\"age\":\"\",\"weight\":null,\"notes\":\"E2E pet\"},\"message\":\"Hewan berhasil ditambahkan.\"}} | {\"ok\":true,\"data\":{\"profile\":{\"address\":\"Jl Owner E2E Jakarta\",\"latitude\":\"-6.2100000\",\"longitude\":\"106.8100000\",\"full_name\":\"E2E Owner\",\"contact_phone\":\"628179086540\"},\"pets\":[{\"id\":\"14\",\"name\":\"Buddy\",\"species\":\"dog\",\"breed\":\"Mix\",...",
+                      "pet_id":  "14"
+                  },
+                  {
+                      "step":  6,
+                      "name":  "create_request_dog_walking",
+                      "status":  "ok",
+                      "success":  true,
+                      "http_status":  201,
+                      "response_snippet":  "{\"ok\":true,\"data\":{\"request_id\":\"15\",\"status\":\"open\",\"message\":\"Permintaan marketplace berhasil dibuat.\"}}",
+                      "request_id":  "15"
+                  },
+                  {
+                      "step":  7,
+                      "name":  "list_requests_create_offer",
+                      "status":  "ok",
+                      "success":  true,
+                      "http_status":  201,
+                      "response_snippet":  "{\"ok\":true,\"data\":{\"offer_id\":\"13\",\"request_id\":\"15\",\"status\":\"pending\",\"message\":\"Penawaran berhasil dikirim.\"}}",
+                      "offer_id":  "13",
+                      "request_id":  "15"
+                  },
+                  {
+                      "step":  8,
+                      "name":  "accept_offer",
+                      "status":  "ok",
+                      "success":  true,
+                      "http_status":  200,
+                      "response_snippet":  "{\"ok\":true,\"data\":{\"booking_id\":\"15\",\"offer_id\":\"13\",\"request_id\":\"15\",\"status\":\"awaitingPayment\",\"total_price\":90000,\"payment_amount\":94500,\"message\":\"Penawaran diterima. Booking dibuat.\"}}",
+                      "booking_id":  "15",
+                      "offer_id":  "13"
+                  },
+                  {
+                      "step":  9,
+                      "name":  "payment_proof_admin_approve_paid",
+                      "status":  "ok",
+                      "success":  true,
+                      "http_status":  200,
+                      "response_snippet":  "{\"ok\":true,\"proof_id\":\"11\",\"booking_id\":\"15\",\"status\":\"PENDING_VERIFICATION\",\"display_label\":\"Menunggu Verifikasi\"} | {\"ok\":true,\"booking_id\":\"15\",\"status\":\"PAID\",\"platform_fee_breakdown\":{\"total_price\":90000,\"platform_fee_owner\":4500,\"platform_fee_sitter\":7200,\"sitter_net\":82800,\"amount_received\":94500}} | status=PAID",
+                      "booking_id":  "15"
+                  },
+                  {
+                      "step":  10,
+                      "name":  "booking_lifecycle",
+                      "status":  "ok",
+                      "success":  true,
+                      "http_status":  200,
+                      "response_snippet":  "{\"ok\":true,\"data\":{\"booking_id\":\"15\",\"status\":\"completed\",\"wallet\":{\"total_price\":90000,\"platform_fee_sitter\":7200,\"platform_fee_sitter_percent\":0.08,\"sitter_net\":82800},\"message\":\"Layanan selesai. Pendapatan dicatat di wallet.\"}}",
+                      "booking_id":  "15"
+                  },
+                  {
+                      "step":  11,
+                      "name":  "wallet_verification",
+                      "status":  "ok",
+                      "success":  true,
+                      "http_status":  200,
+                      "response_snippet":  "balance=82800 income=90000 fee=7200 expected_balance=82800 platform_fee=7200",
+                      "booking_id":  "15"
+                  },
+                  {
+                      "step":  12,
+                      "name":  "chat_send_reply_get_messages",
+                      "status":  "ok",
+                      "success":  true,
+                      "http_status":  200,
+                      "response_snippet":  "{\"ok\":true,\"data\":{\"booking_id\":\"15\",\"messages\":[{\"id\":\"19\",\"booking_id\":\"15\",\"sender_user_id\":\"41\",\"text\":\"Halo dari owner E2E\",\"created_at\":\"2026-06-06 08:17:11.848880\"},{\"id\":\"20\",\"booking_id\":\"15\",\"sender_user_id\":\"42\",\"text\":\"Halo dari sitter E2E\",\"created_at\":\"2026-06-06 08:17:12.632675\"}],\"total\":2}}",
+                      "booking_id":  "15"
+                  },
+                  {
+                      "step":  13,
+                      "name":  "notifications_check_new",
+                      "status":  "ok",
+                      "success":  true,
+                      "http_status":  200,
+                      "response_snippet":  "owner_unread=4 sitter_unread=4 | owner={\"ok\":true,\"data\":{\"unread_count\":4,\"has_new\":true}} | sitter={\"ok\":true,\"data\":{\"unread_count\":4,\"has_new\":true}}"
+                  },
+                  {
+                      "step":  14,
+                      "name":  "wallet_get_balance_request_withdrawal",
+                      "status":  "ok",
+                      "success":  true,
+                      "http_status":  201,
+                      "response_snippet":  "{\"ok\":true,\"data\":{\"balance\":82800,\"pending_withdrawals\":0,\"available\":82800}} | {\"ok\":true,\"data\":{\"withdrawal\":{\"id\":\"11\",\"user_id\":\"42\",\"amount\":10000,\"status\":\"pending\",\"created_at\":\"2026-06-06 08:17:16.000000\",\"completed_at\":null},\"available_balance\":72800,\"message\":\"Permintaan penarikan dikirim. Menunggu persetujuan admin.\"}}",
+                      "withdrawal_id":  "11"
+                  },
+                  {
+                      "step":  15,
+                      "name":  "admin_approve_withdrawal",
+                      "status":  "ok",
+                      "success":  true,
+                      "http_status":  200,
+                      "response_snippet":  "{\"ok\":true,\"data\":{\"withdrawal_id\":\"11\",\"user_id\":\"42\",\"amount\":10000,\"status\":\"completed\",\"message\":\"Penarikan disetujui.\"}}",
+                      "withdrawal_id":  "11"
+                  }
+              ]
+}

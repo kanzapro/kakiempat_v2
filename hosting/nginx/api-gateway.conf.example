@@ -1,0 +1,100 @@
+# Kaki Empat v2 — NGINX API gateway (api.kakiempat.com)
+# Salin ke server block cPanel/WHM atau include dari nginx.conf utama.
+# Sesuaikan root, fastcgi_pass, dan path SSL.
+
+# --- Rate limiting (Money Engine First: lindungi auth & webhook) ---
+limit_req_zone $binary_remote_addr zone=v2_auth:10m rate=10r/m;
+limit_req_zone $binary_remote_addr zone=v2_api:10m rate=120r/m;
+limit_req_zone $binary_remote_addr zone=v2_webhook:10m rate=30r/m;
+
+# Upstream PHP-FPM (sesuaikan socket/port hosting)
+# upstream kakiempat_php {
+#     server unix:/var/run/php-fpm/www.sock;
+# }
+
+server {
+    listen 443 ssl http2;
+    server_name api.kakiempat.com www.api.kakiempat.com;
+
+    # ssl_certificate     /path/to/fullchain.pem;
+    # ssl_certificate_key /path/to/privkey.pem;
+
+    root /home/USER/api.kakiempat.com;
+    index index.php;
+
+    # Security headers (mirror .htaccess API)
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    # Blokir file sensitif
+    location ~ /\.(mysql_v2|payment_config|payment_webhook_secret|env|migrate) {
+        deny all;
+        return 404;
+    }
+    location ~ ^/schema/ {
+        deny all;
+        return 404;
+    }
+
+    # Auth endpoints — rate limit ketat
+    location ~ ^/auth_v2\.php {
+        limit_req zone=v2_auth burst=5 nodelay;
+        limit_req_status 429;
+        try_files $uri =404;
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_pass unix:/var/run/php-fpm/www.sock;
+    }
+
+    # Payment webhook — secret header + moderate limit
+    location ~ ^/payment_webhook\.php {
+        limit_req zone=v2_webhook burst=10 nodelay;
+        limit_req_status 429;
+        try_files $uri =404;
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_pass unix:/var/run/php-fpm/www.sock;
+    }
+
+    # BFF money engine — owner dashboard agregat
+    location ~ ^/owner_v2\.php {
+        limit_req zone=v2_api burst=40 nodelay;
+        limit_req_status 429;
+        try_files $uri =404;
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_pass unix:/var/run/php-fpm/www.sock;
+    }
+
+    # Semua endpoint API v2 lainnya
+    location ~ \.php$ {
+        limit_req zone=v2_api burst=60 nodelay;
+        limit_req_status 429;
+        try_files $uri =404;
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_pass unix:/var/run/php-fpm/www.sock;
+    }
+
+    # Health check tanpa rate limit berat
+    location = /health.php {
+        try_files $uri =404;
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_pass unix:/var/run/php-fpm/www.sock;
+    }
+
+    location / {
+        return 404;
+    }
+}
+
+# Redirect HTTP → HTTPS
+server {
+    listen 80;
+    server_name api.kakiempat.com www.api.kakiempat.com;
+    return 301 https://$host$request_uri;
+}

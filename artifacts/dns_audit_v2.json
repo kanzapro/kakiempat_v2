@@ -1,0 +1,80 @@
+﻿[
+    {
+        "host":  "kakiempat.com",
+        "type":  "A",
+        "expected":  "178.83.188.195",
+        "status":  "OK"
+    },
+    {
+        "host":  "www.kakiempat.com",
+        "type":  "CNAME",
+        "expected":  "kakiempat.com",
+        "status":  "OK"
+    },
+    {
+        "host":  "api.kakiempat.com",
+        "type":  "A",
+        "expected":  "178.83.188.195",
+        "status":  "OK"
+    },
+    {
+        "host":  "www.api.kakiempat.com",
+        "type":  "A",
+        "expected":  "178.83.188.195",
+        "status":  "OK"
+    },
+    {
+        "host":  "owner.kakiempat.com",
+        "type":  "A",
+        "expected":  "178.83.188.195",
+        "status":  "OK"
+    },
+    {
+        "host":  "www.owner.kakiempat.com",
+        "type":  "A",
+        "expected":  "178.83.188.195",
+        "status":  "OK"
+    },
+    {
+        "host":  "sitter.kakiempat.com",
+        "type":  "A",
+        "expected":  "178.83.188.195",
+        "status":  "OK"
+    },
+    {
+        "host":  "www.sitter.kakiempat.com",
+        "type":  "A",
+        "expected":  "178.83.188.195",
+        "status":  "OK"
+    },
+    {
+        "host":  "admin.kakiempat.com",
+        "type":  "A",
+        "expected":  "178.83.188.195",
+        "status":  "OK"
+    },
+    {
+        "host":  "www.admin.kakiempat.com",
+        "type":  "A",
+        "expected":  "178.83.188.195",
+        "status":  "OK"
+    },
+    {
+        "host":  "staging.kakiempat.com",
+        "type":  "A",
+        "expected":  "178.83.188.195",
+        "status":  "OK"
+    },
+    {
+        "host":  "www.staging.kakiempat.com",
+        "type":  "A",
+        "expected":  "178.83.188.195",
+        "status":  "OK"
+    },
+    {
+        "host":  "ftp.kakiempat.com",
+        "type":  "A",
+        "expected":  "178.83.188.195",
+        "status":  "OK"
+    }
+]

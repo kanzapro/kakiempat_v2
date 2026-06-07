@@ -1,0 +1,70 @@
+---
+description: Kredensial & akses cPanel/hosting Kaki Empat — agen tidak perlu minta password lagi
+alwaysApply: true
+---
+
+# Akses hosting & cPanel (Kaki Empat v2)
+
+> **Stack v2:** PHP + MySQL self-hosted only — **no Firebase/FCM/BaaS**. Lihat rule `v2-stack-forbidden-services`.
+
+## Lokasi kredensial (wajib dibaca dulu)
+
+Semua kredensial server ada di:
+
+**`.cursor/secrets/hosting.credentials`**
+
+- Format INI (`[cpanel]`, `[mysql_v2]`, `[api_deploy]`, `[subdomains]`)
+- Template tanpa rahasia: `.cursor/secrets/hosting.credentials.example`
+- File `hosting.credentials` **di-gitignore** — jangan commit, jangan salin ke chat
+
+Jika file ada dan terbaca, **jangan minta user username/password cPanel lagi**. Langsung pakai nilai dari file.
+
+## Login cPanel
+
+1. URL: nilai `cpanel.url` (default `https://kakiempat.com:2083`)
+2. User / password: dari section `[cpanel]`
+3. **Satu percobaan login**, jeda antar langkah (risiko blokir IP jika terlalu cepat/berulang)
+4. Opsi otomasi: browser MCP → navigate → isi form → login sekali
+
+## MySQL v2 (aplikasi & API)
+
+Gunakan section `[mysql_v2]` untuk:
+
+- `lib/core/config/env_config.dart` / dart-define
+- `.env` lokal (salin dari `.env.example`)
+- `hosting_v2/api/.mysql_v2.php` di server (jangan commit)
+
+## Deploy & verifikasi
+
+| Tugas | Referensi |
+|--------|-----------|
+| Paket API lokal | `scripts/deploy_api.ps1` → `build/deploy_api` |
+| Upload API FTP | `scripts/deploy_via_ftp.ps1 -Target api` |
+| Owner BFF saja | `scripts/deploy_api_owner.ps1 -Upload` (lihat rule `deploy-workflow`) |
+| Build Flutter web | `scripts/deploy_web.ps1 -WebRenderer html -Target owner` |
+| Docroot API | `api_deploy.docroot` |
+| Cek API hidup | `curl` ke `api_deploy.health_url` |
+| Migrasi SQL | `api_deploy.migrate_url?secret=...&file=001_core_tables.sql` |
+| Kosongkan DB v2 | `scripts/db/truncate_kakiempa_v2.sql` / `scripts/truncate_v2_database.ps1` |
+
+Subdomain aktif: lihat `[subdomains]` di `hosting.credentials` / `.example`.
+
+## Arsitektur 6 subdomain
+
+| Subdomain | Fungsi | Target pengguna | Deploy / kode |
+|-----------|--------|-----------------|---------------|
+| `www.kakiempat.com` | Landing & marketing (layanan, harga, testimoni, blog, form daftar owner/sitter) | Visitor, calon pengguna | `scripts/deploy_web.ps1 -Target www` → docroot `public_html` |
+| `owner.kakiempat.com` | Dashboard pemilik hewan (profil hewan, booking, jadwal, transaksi, ulasan) | Pet owner (login) | `deploy_web.ps1 -Target owner`; `WebDomain.owner` + `AuthGate` → `OwnerHomePage` |
+| `sitter.kakiempat.com` | Dashboard pengasuh (ketersediaan, terima/tolak booking, laporan, profil) | Pet sitter (login) | `deploy_web.ps1 -Target sitter`; `WebDomain.sitter` → `SitterLandingPage` |
+| `admin.kakiempat.com` | Panel admin (verifikasi sitter, booking, transaksi, laporan, pengaturan) | Admin / operator | `deploy_web.ps1 -Target admin`; `WebDomain.admin` + `AuthGate` → `AdminPanelPage` |
+| `staging.kakiempat.com` | Uji coba frontend terisolasi (branch/DB staging, bukan production) | Developer, QA | `deploy_web.ps1 -Target staging`; `WebDomain.staging` (AuthGate owner) |
+| `api.kakiempat.com` | REST API stateless (auth, user, booking, pet, payment, notifikasi, review) | Hanya frontend (bukan user langsung) | `scripts/deploy_api.ps1`; `EnvConfig.apiBaseUrl`; docroot `[api_deploy]` |
+
+Infrastruktur: SSL wildcard `*.kakiempat.com`; routing NGINX reverse proxy; API dapat di-scale horizontal.
+
+Deteksi host web: `lib/core/web/domain_router.dart` (hostname → `WebDomain`).
+
+## Keamanan
+
+- Jangan ulangi password penuh di respons chat ke user
+- Jika kredensial bocor/rotasi, update hanya `hosting.credentials` (dan password di cPanel)

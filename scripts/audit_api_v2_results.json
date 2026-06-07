@@ -1,0 +1,310 @@
+﻿[
+    {
+        "Num":  1,
+        "Endpoint":  "health.php",
+        "Status":  "OK",
+        "HTTP":  200,
+        "Notes":  "{\"ok\":true,\"service\":\"kakiempat_v2_api\",\"version\":\"0.2.0\",\"mysql_ok\":true,\"ts\":\"2026-06-05T19:33:25+..."
+    },
+    {
+        "Num":  2,
+        "Endpoint":  "auth/register (owner)",
+        "Status":  "OK",
+        "HTTP":  201,
+        "Notes":  "{\"ok\":true,\"token\":\"native_2c1ece47f7dc917df96deb553066daed1c6ce4d2605f1fd51942a33f6699a3cc\",\"user\":..."
+    },
+    {
+        "Num":  3,
+        "Endpoint":  "auth/register (sitter)",
+        "Status":  "OK",
+        "HTTP":  201,
+        "Notes":  "{\"ok\":true,\"token\":\"native_575a7187e6d03caf63f6470812224d4b7d00ae4fd1da813a4446874147d0d680\",\"user\":..."
+    },
+    {
+        "Num":  4,
+        "Endpoint":  "auth/login (owner)",
+        "Status":  "OK",
+        "HTTP":  200,
+        "Notes":  "{\"ok\":true,\"token\":\"native_44ca120d2cd15133d646a52f5c1fc220a8d50478bec5e7c7c1a6a84ae1ddddc3\",\"user\":..."
+    },
+    {
+        "Num":  5,
+        "Endpoint":  "auth/login (sitter)",
+        "Status":  "OK",
+        "HTTP":  200,
+        "Notes":  "{\"ok\":true,\"token\":\"native_c0e13158afa961951da6c5137596266a622268e77cf7d0a643adf7c1ea9d28e7\",\"user\":..."
+    },
+    {
+        "Num":  6,
+        "Endpoint":  "auth/login (founder)",
+        "Status":  "OK",
+        "HTTP":  200,
+        "Notes":  "{\"ok\":true,\"token\":\"native_680f56ef9dba38a55f9f1a4c08dc0c381f34494df8e096f5533a8e8d56f06b31\",\"user\":..."
+    },
+    {
+        "Num":  7,
+        "Endpoint":  "auth/validate_token",
+        "Status":  "OK",
+        "HTTP":  200,
+        "Notes":  "{\"ok\":true,\"user\":{\"id\":21,\"phone\":\"6289780688002\",\"role\":\"owner\",\"name\":\"Owner Audit\"}}"
+    },
+    {
+        "Num":  8,
+        "Endpoint":  "sitter/get_profile",
+        "Status":  "OK",
+        "HTTP":  200,
+        "Notes":  "{\"ok\":true,\"data\":{\"profile\":{\"bio\":\"\",\"address\":\"-\",\"latitude\":null,\"longitude\":null,\"status\":\"draf..."
+    },
+    {
+        "Num":  9,
+        "Endpoint":  "sitter/save_profile",
+        "Status":  "OK",
+        "HTTP":  200,
+        "Notes":  "{\"ok\":true,\"data\":{\"profile\":{\"bio\":\"Audit sitter\",\"address\":\"Jl Sitter 1 Jakarta\",\"latitude\":-6.2,\"..."
+    },
+    {
+        "Num":  10,
+        "Endpoint":  "sitter/submit_verification",
+        "Status":  "OK",
+        "HTTP":  200,
+        "Notes":  "{\"ok\":true,\"data\":{\"message\":\"Profil dikirim untuk verifikasi. Tim Kaki Empat akan meninjau segera.\"..."
+    },
+    {
+        "Num":  11,
+        "Endpoint":  "owner/get_profile",
+        "Status":  "OK",
+        "HTTP":  200,
+        "Notes":  "{\"ok\":true,\"data\":{\"profile\":null,\"pets\":[],\"onboarding_complete\":false,\"needs_onboarding\":true}}"
+    },
+    {
+        "Num":  12,
+        "Endpoint":  "owner/save_profile",
+        "Status":  "OK",
+        "HTTP":  200,
+        "Notes":  "{\"ok\":true,\"data\":{\"profile\":{\"address\":\"Jl Owner 1 Jakarta\",\"latitude\":\"-6.2100000\",\"longitude\":\"10..."
+    },
+    {
+        "Num":  13,
+        "Endpoint":  "owner/add_pet",
+        "Status":  "OK",
+        "HTTP":  201,
+        "Notes":  "{\"ok\":true,\"data\":{\"pet\":{\"id\":\"4\",\"name\":\"Milo\",\"species\":\"dog\",\"breed\":\"Mix\",\"age\":\"\",\"weight\":nul..."
+    },
+    {
+        "Num":  14,
+        "Endpoint":  "service/get_catalog",
+        "Status":  "OK",
+        "HTTP":  200,
+        "Notes":  "{\"ok\":true,\"data\":{\"total\":19,\"services\":[{\"code\":\"dog_walking\",\"label\":\"Dog Walking\",\"category\":\"sp..."
+    },
+    {
+        "Num":  15,
+        "Endpoint":  "admin/approve_sitter",
+        "Status":  "OK",
+        "HTTP":  200,
+        "Notes":  "{\"ok\":true,\"data\":{\"sitter_id\":\"22\",\"status\":\"approved\",\"message\":\"Pengasuh disetujui.\"}}"
+    },
+    {
+        "Num":  16,
+        "Endpoint":  "marketplace/create_request",
+        "Status":  "OK",
+        "HTTP":  201,
+        "Notes":  "{\"ok\":true,\"data\":{\"request_id\":\"4\",\"status\":\"open\",\"message\":\"Permintaan marketplace berhasil dibua..."
+    },
+    {
+        "Num":  17,
+        "Endpoint":  "marketplace/list_requests",
+        "Status":  "OK",
+        "HTTP":  200,
+        "Notes":  "{\"ok\":true,\"data\":{\"requests\":[{\"id\":\"4\",\"owner_user_id\":\"21\",\"owner_name\":\"Owner Audit\",\"scheduled_..."
+    },
+    {
+        "Num":  18,
+        "Endpoint":  "marketplace/create_offer",
+        "Status":  "OK",
+        "HTTP":  201,
+        "Notes":  "{\"ok\":true,\"data\":{\"offer_id\":\"3\",\"request_id\":\"4\",\"status\":\"pending\",\"message\":\"Penawaran berhasil ..."
+    },
+    {
+        "Num":  19,
+        "Endpoint":  "marketplace/accept_offer",
+        "Status":  "OK",
+        "HTTP":  200,
+        "Notes":  "{\"ok\":true,\"data\":{\"booking_id\":\"5\",\"offer_id\":\"3\",\"request_id\":\"4\",\"status\":\"awaitingPayment\",\"tota..."
+    },
+    {
+        "Num":  20,
+        "Endpoint":  "marketplace/create_request (cancel)",
+        "Status":  "OK",
+        "HTTP":  201,
+        "Notes":  "{\"ok\":true,\"data\":{\"request_id\":\"5\",\"status\":\"open\",\"message\":\"Permintaan marketplace berhasil dibua..."
+    },
+    {
+        "Num":  21,
+        "Endpoint":  "marketplace/create_offer (cancel)",
+        "Status":  "OK",
+        "HTTP":  201,
+        "Notes":  "{\"ok\":true,\"data\":{\"offer_id\":\"4\",\"request_id\":\"5\",\"status\":\"pending\",\"message\":\"Penawaran berhasil ..."
+    },
+    {
+        "Num":  22,
+        "Endpoint":  "marketplace/accept_offer (cancel)",
+        "Status":  "OK",
+        "HTTP":  200,
+        "Notes":  "{\"ok\":true,\"data\":{\"booking_id\":\"6\",\"offer_id\":\"4\",\"request_id\":\"5\",\"status\":\"awaitingPayment\",\"tota..."
+    },
+    {
+        "Num":  23,
+        "Endpoint":  "booking/cancel_booking",
+        "Status":  "OK",
+        "HTTP":  200,
+        "Notes":  "{\"ok\":true,\"data\":{\"booking_id\":\"6\",\"status\":\"cancelled\",\"message\":\"Booking dibatalkan.\"}}"
+    },
+    {
+        "Num":  24,
+        "Endpoint":  "payment/submit_proof",
+        "Status":  "OK",
+        "HTTP":  200,
+        "Notes":  "{\"ok\":true,\"proof_id\":\"2\",\"booking_id\":\"5\",\"status\":\"PENDING_VERIFICATION\",\"display_label\":\"Menunggu..."
+    },
+    {
+        "Num":  25,
+        "Endpoint":  "payment/admin_approve",
+        "Status":  "OK",
+        "HTTP":  200,
+        "Notes":  "{\"ok\":true,\"booking_id\":\"5\",\"status\":\"PAID\",\"platform_fee_breakdown\":{\"total_price\":150000,\"platform..."
+    },
+    {
+        "Num":  26,
+        "Endpoint":  "payment_status.php?booking_id=1",
+        "Status":  "OK",
+        "HTTP":  200,
+        "Notes":  "{\"ok\":true,\"booking_id\":\"1\",\"status\":\"awaitingPayment\",\"payment_state\":\"waiting\",\"display_label\":\"Me..."
+    },
+    {
+        "Num":  27,
+        "Endpoint":  "payment_webhook.php",
+        "Status":  "OK",
+        "HTTP":  200,
+        "Notes":  "{\"ok\":true,\"matched\":false,\"sender_bank\":\"SEABANK_TRANSFER\",\"booking_id\":null}"
+    },
+    {
+        "Num":  28,
+        "Endpoint":  "booking/sitter_confirm",
+        "Status":  "OK",
+        "HTTP":  200,
+        "Notes":  "{\"ok\":true,\"data\":{\"booking_id\":\"5\",\"status\":\"confirmed\",\"message\":\"Booking dikonfirmasi.\"}}"
+    },
+    {
+        "Num":  29,
+        "Endpoint":  "booking/sitter_en_route",
+        "Status":  "OK",
+        "HTTP":  200,
+        "Notes":  "{\"ok\":true,\"data\":{\"booking_id\":\"5\",\"status\":\"en_route\",\"message\":\"Status diperbarui: dalam perjalan..."
+    },
+    {
+        "Num":  30,
+        "Endpoint":  "booking/start_booking",
+        "Status":  "OK",
+        "HTTP":  200,
+        "Notes":  "{\"ok\":true,\"data\":{\"booking_id\":\"5\",\"status\":\"in_progress\",\"message\":\"Layanan dimulai.\"}}"
+    },
+    {
+        "Num":  31,
+        "Endpoint":  "booking/complete_booking",
+        "Status":  "OK",
+        "HTTP":  200,
+        "Notes":  "{\"ok\":true,\"data\":{\"booking_id\":\"5\",\"status\":\"completed\",\"wallet\":{\"total_price\":150000,\"platform_fe..."
+    },
+    {
+        "Num":  32,
+        "Endpoint":  "wallet/get_balance",
+        "Status":  "OK",
+        "HTTP":  200,
+        "Notes":  "{\"ok\":true,\"data\":{\"balance\":138000,\"pending_withdrawals\":0,\"available\":138000}}"
+    },
+    {
+        "Num":  33,
+        "Endpoint":  "wallet/get_ledger",
+        "Status":  "OK",
+        "HTTP":  200,
+        "Notes":  "{\"ok\":true,\"data\":{\"balance\":138000,\"gross_income\":150000,\"platform_fees\":-12000,\"net_income\":138000..."
+    },
+    {
+        "Num":  34,
+        "Endpoint":  "wallet/request_withdrawal",
+        "Status":  "OK",
+        "HTTP":  201,
+        "Notes":  "{\"ok\":true,\"data\":{\"withdrawal\":{\"id\":\"2\",\"user_id\":\"22\",\"amount\":10000,\"status\":\"pending\",\"created_..."
+    },
+    {
+        "Num":  35,
+        "Endpoint":  "chat/send_message",
+        "Status":  "OK",
+        "HTTP":  201,
+        "Notes":  "{\"ok\":true,\"data\":{\"message_id\":\"2\",\"booking_id\":\"5\",\"text\":\"Halo audit\",\"sender_user_id\":\"21\"}}"
+    },
+    {
+        "Num":  36,
+        "Endpoint":  "chat/get_messages",
+        "Status":  "OK",
+        "HTTP":  200,
+        "Notes":  "{\"ok\":true,\"data\":{\"booking_id\":\"5\",\"messages\":[{\"id\":\"2\",\"booking_id\":\"5\",\"sender_user_id\":\"21\",\"te..."
+    },
+    {
+        "Num":  37,
+        "Endpoint":  "chat/check_new_messages",
+        "Status":  "OK",
+        "HTTP":  200,
+        "Notes":  "{\"ok\":true,\"data\":{\"booking_id\":\"5\",\"count\":1,\"has_new\":true,\"latest_at\":\"2026-06-05 19:33:51.808015..."
+    },
+    {
+        "Num":  38,
+        "Endpoint":  "notification/check_new",
+        "Status":  "OK",
+        "HTTP":  200,
+        "Notes":  "{\"ok\":true,\"data\":{\"unread_count\":4,\"has_new\":true}}"
+    },
+    {
+        "Num":  39,
+        "Endpoint":  "notification/get_notifications",
+        "Status":  "OK",
+        "HTTP":  200,
+        "Notes":  "{\"ok\":true,\"data\":{\"notifications\":[{\"id\":\"18\",\"title\":\"Layanan Selesai\",\"is_read\":false,\"created_at..."
+    },
+    {
+        "Num":  40,
+        "Endpoint":  "notification/mark_read",
+        "Status":  "OK",
+        "HTTP":  200,
+        "Notes":  "{\"ok\":true,\"data\":{\"notification_id\":\"18\",\"marked\":true}}"
+    },
+    {
+        "Num":  41,
+        "Endpoint":  "admin/list_sitters",
+        "Status":  "OK",
+        "HTTP":  200,
+        "Notes":  "{\"ok\":true,\"data\":{\"sitters\":[{\"sitter_id\":\"22\",\"user_id\":\"22\",\"name\":\"Sitter Audit\",\"phone\":\"628878..."
+    },
+    {
+        "Num":  42,
+        "Endpoint":  "admin/list_owners",
+        "Status":  "OK",
+        "HTTP":  200,
+        "Notes":  "{\"ok\":true,\"data\":{\"owners\":[{\"user_id\":\"21\",\"name\":\"Owner Audit\",\"phone\":\"6289780688002\",\"is_active..."
+    },
+    {
+        "Num":  43,
+        "Endpoint":  "admin/list_bookings",
+        "Status":  "OK",
+        "HTTP":  200,
+        "Notes":  "{\"ok\":true,\"data\":{\"bookings\":[{\"id\":\"6\",\"offer_id\":\"4\",\"request_id\":\"5\",\"owner_user_id\":\"21\",\"owner..."
+    },
+    {
+        "Num":  44,
+        "Endpoint":  "admin/approve_withdrawal",
+        "Status":  "OK",
+        "HTTP":  200,
+        "Notes":  "{\"ok\":true,\"data\":{\"withdrawal_id\":\"2\",\"user_id\":\"22\",\"amount\":10000,\"status\":\"completed\",\"message\":..."
+    }
+]

@@ -1,0 +1,87 @@
+---
+description: Deploy otomatis GitHub Actions, diagnostik agent_health, dan workflow push — wajib semua agen
+alwaysApply: true
+---
+
+# Agent Deploy Automation (Kaki Empat v2)
+
+Semua agen **wajib** mengikuti jalur deploy ini. Jangan improvisasi FTP manual atau path docroot salah.
+
+## Stack & docroot (jangan salah)
+
+```
+Flutter web → api.kakiempat.com (PHP) → MySQL kakiempa_v2
+```
+
+| Target | Docroot FTP (relatif `/home/kakiempa/`) |
+|--------|------------------------------------------|
+| API/BFF | `api.kakiempat.com/` |
+| Owner | `owner.kakiempat.com/` |
+| Sitter | `sitter.kakiempat.com/` |
+| Admin | `admin.kakiempat.com/` |
+| Staging | `staging.kakiempat.com/` |
+| WWW | `public_html/` |
+
+**Larangan:** `/public_html/api/` — path itu salah.
+
+## GitHub Actions (utama — hindari blokir IP)
+
+| Workflow | File | Pemicu | Fungsi |
+|----------|------|--------|--------|
+| Super Charge Backend | `.github/workflows/deploy.yml` | Push `main`/`master` + perubahan `hosting/api.kakiempat.com/**` | Delta FTP backend → `api.kakiempat.com/` + cek `health.php` |
+| Deploy Web/API manual | `.github/workflows/deploy-ftp.yml` | Actions → Run workflow | Pilih target: api, owner, sitter, admin, staging, www, owner-and-api |
+
+**Secrets GitHub (wajib):** `FTP_SERVER`, `FTP_USERNAME`, `FTP_PASSWORD`, `FTP_PORT` (21).  
+Panduan: `.github/DEPLOY_SECRETS.md`
+
+## Alur kerja agen setelah mengubah kode
+
+### Backend PHP (BFF, katalog layanan, payment, booking)
+
+1. Edit di `hosting/api.kakiempat.com/**`
+2. Commit lokal — **jangan** stage file rahasia (`.mysql_v2.php`, `.agent_telemetry_secret`, `hosting.credentials`)
+3. `git push` ke `main` atau `master` → Actions **Super Charge** deploy otomatis
+4. Verifikasi: `curl https://www.api.kakiempat.com/health.php`
+
+### Flutter web (owner/sitter/admin/www)
+
+1. Build lokal (opsional uji): `.\scripts\deploy_web.ps1 -Target owner -WebRenderer html`
+2. Push kode ke GitHub, lalu jalankan workflow **Deploy via FTP** target sesuai subdomain  
+   ATAU lokal: `.\scripts\deploy_web.ps1 -Target owner -WebRenderer html -Upload`
+3. Money engine penuh: `.\scripts\deploy_owner.ps1 -Layer both -WebRenderer html -Upload`
+
+### Deploy lokal (fallback, bukan utama)
+
+```powershell
+.\scripts\deploy_api.ps1
+.\scripts\deploy_via_ftp.ps1 -Target api
+.\scripts\deploy_api_owner.ps1 -Upload   # hanya owner_v2.php (parsial)
+```
+
+**Jangan** upload file satu-per-satu via curl/FTP manual.
+
+## Mata elang — diagnostik mandiri
+
+Setelah deploy atau saat debug produksi:
+
+```http
+GET https://www.api.kakiempat.com/health.php
+GET https://www.api.kakiempat.com/admin_v2.php?action=agent_health&token=SECRET
+```
+
+- Secret server: `.agent_telemetry_secret` (template: `.agent_telemetry_secret.example`) — **hanya di server**, jangan commit
+- Metrics: booking hari ini, platform fee, DB status, disk
+
+## Prioritas & batasan
+
+- **Money Engine** (`owner_v2.php`) harus stabil — uji sebelum push besar
+- Fitur loyalty/community/referral → di belakang `MvpScope` (`lib/core/config/mvp_scope.dart`)
+- Query MySQL baru → manfaatkan INDEX (`created_at`, `status`)
+- Stack v2 only — no Firebase/FCM/BaaS (lihat `v2-stack-forbidden-services.mdc`)
+
+## Checklist sebelum selesai task deploy
+
+- [ ] Tidak ada rahasia ter-commit
+- [ ] Push/workflow Actions hijau
+- [ ] `health.php` → `mysql_ok: true`
+- [ ] Subdomain target bisa diakses (owner/admin/dll. sesuai scope)

@@ -1,0 +1,43 @@
+# Kaki Empat API v2 — HTTPS, security headers, deny sensitive files
+
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+RewriteEngine On
+RewriteCond %{HTTPS} !=on
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+</IfModule>
+
+<IfModule mod_headers.c>
+Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+Header always set X-Content-Type-Options "nosniff"
+Header always set X-Frame-Options "DENY"
+Header always set X-XSS-Protection "1; mode=block"
+Header always set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+<Files ".mysql_v2.php">
+Require all denied
+</Files>
+<Files ".migrate_v2_secret">
+Require all denied
+</Files>
+<Files ".payment_webhook_secret">
+Require all denied
+</Files>
+<Files ".payment_config.php">
+Require all denied
+</Files>
+<Files ".env">
+Require all denied
+</Files>
+
+<FilesMatch "\.(env|secret|key)$">
+Require all denied
+</FilesMatch>
+
+<IfModule mod_authz_core.c>
+<DirectoryMatch "^/.*/schema/">
+Require all denied
+</DirectoryMatch>
+</IfModule>

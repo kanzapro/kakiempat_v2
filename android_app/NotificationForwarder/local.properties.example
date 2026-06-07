@@ -1,0 +1,2 @@
+# Salin ke local.properties (jangan commit). Token harus sama dengan .payment_webhook_secret di server.
+payment.webhook.secret=KE_SECURE_NOTIF_TOKEN_2026_BYPASS

@@ -1,0 +1,22 @@
+{
+  "name": "kakiempat-api",
+  "scheme": "ftp",
+  "host": "178.83.188.195",
+  "username": "CPANEL_USER",
+  "password": "CPANEL_PASSWORD",
+  "localPath": "${workspaceFolder}/build/deploy_api",
+  "remotePath": "api.kakiempat.com",
+  "uploadOnSave": false,
+  "ignore": [
+    ".git/**",
+    "node_modules/**",
+    "vendor/**",
+    "storage/logs/**",
+    "backups/**",
+    "uploads/**",
+    ".mysql_v2.php",
+    ".migrate_v2_secret",
+    ".payment_webhook_secret",
+    ".payment_config.php"
+  ]
+}

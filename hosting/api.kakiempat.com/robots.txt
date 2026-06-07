@@ -1,0 +1,3 @@
+# API endpoint - block search engine indexing
+User-agent: *
+Disallow: /

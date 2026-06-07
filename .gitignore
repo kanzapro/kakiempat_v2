@@ -1,0 +1,71 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# The .vscode folder contains launch configuration and tasks you configure in
+# VS Code which you may wish to be included in version control, so this line
+# is commented out by default.
+#.vscode/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+/coverage/
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# WinSCP runtime (bootstrap NuGet lokal)
+scripts/lib/.winscp/
+scripts/lib/winscp/
+
+# Secrets & env
+.env
+.cursor/secrets/hosting.credentials
+hosting_v2/api/.mysql_v2.php
+hosting_v2/api/.migrate_v2_secret
+hosting/api.kakiempat.com/.mysql_v2.php
+hosting/api.kakiempat.com/.agent_telemetry_secret
+hosting/api.kakiempat.com/.payment_webhook_secret
+hosting/api.kakiempat.com/.payment_config.php
+hosting/api.kakiempat.com/.migrate_v2_secret
+hosting/api.kakiempat.com/.notifications_path.php
+
+# Android / Gradle build artifacts
+android_app/**/build/
+android_app/**/.gradle/
+**/.gradle/
+**/local.properties
+.vscode/ftp.json
+.vscode/ftp-api.json
+.vscode/ftp-owner.json
+.vscode/ftp-sitter.json
+
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release

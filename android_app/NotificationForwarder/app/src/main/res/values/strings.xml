@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Kaki Empat Payment Forwarder</string>
+    <string name="open_notification_access">Buka akses notifikasi</string>
+    <string name="refresh_status">Periksa status</string>
+    <string name="status_listening">Status: Listening — notifikasi SeaBank diteruskan ke webhook.</string>
+    <string name="status_not_listening">Status: Not listening — aktifkan akses notifikasi untuk aplikasi ini.</string>
+    <string name="webhook_log_title">Log webhook</string>
+    <string name="log_empty">Belum ada webhook terkirim.</string>
+</resources>

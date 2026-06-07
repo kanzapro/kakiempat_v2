@@ -1,0 +1,126 @@
+{
+  "ok": false,
+  "hosts": [
+    {
+      "https_ok": false,
+      "cert_expires": null,
+      "http_redirects_https": false,
+      "host": "kakiempat.com",
+      "hsts": false,
+      "errors": [
+        "HTTPS status 415",
+        "HTTP probe failed: Cannot index into a null array.",
+        "Header HSTS tidak ditemukan"
+      ],
+      "label": "apex",
+      "ok": false,
+      "tls_version": null
+    },
+    {
+      "https_ok": false,
+      "cert_expires": null,
+      "http_redirects_https": false,
+      "host": "www.kakiempat.com",
+      "hsts": false,
+      "errors": [
+        "HTTPS status 415",
+        "HTTP probe failed: Cannot index into a null array.",
+        "Header HSTS tidak ditemukan"
+      ],
+      "label": "www",
+      "ok": false,
+      "tls_version": null
+    },
+    {
+      "https_ok": false,
+      "cert_expires": null,
+      "http_redirects_https": false,
+      "host": "owner.kakiempat.com",
+      "hsts": false,
+      "errors": [
+        "HTTPS status 000",
+        "HTTP probe failed: Cannot index into a null array.",
+        "Header HSTS tidak ditemukan"
+      ],
+      "label": "owner",
+      "ok": false,
+      "tls_version": null
+    },
+    {
+      "https_ok": false,
+      "cert_expires": null,
+      "http_redirects_https": false,
+      "host": "sitter.kakiempat.com",
+      "hsts": false,
+      "errors": [
+        "HTTPS status 000",
+        "HTTP probe failed: Cannot index into a null array.",
+        "Header HSTS tidak ditemukan"
+      ],
+      "label": "sitter",
+      "ok": false,
+      "tls_version": null
+    },
+    {
+      "https_ok": false,
+      "cert_expires": null,
+      "http_redirects_https": false,
+      "host": "admin.kakiempat.com",
+      "hsts": false,
+      "errors": [
+        "HTTPS status 000",
+        "HTTP probe failed: Cannot index into a null array.",
+        "Header HSTS tidak ditemukan"
+      ],
+      "label": "admin",
+      "ok": false,
+      "tls_version": null
+    },
+    {
+      "https_ok": false,
+      "cert_expires": null,
+      "http_redirects_https": false,
+      "host": "staging.kakiempat.com",
+      "hsts": false,
+      "errors": [
+        "HTTPS status 000",
+        "HTTP probe failed: Cannot index into a null array.",
+        "Header HSTS tidak ditemukan"
+      ],
+      "label": "staging",
+      "ok": false,
+      "tls_version": null
+    },
+    {
+      "https_ok": false,
+      "cert_expires": null,
+      "http_redirects_https": false,
+      "host": "api.kakiempat.com",
+      "hsts": false,
+      "errors": [
+        "HTTPS status 000",
+        "HTTP probe failed: Cannot index into a null array.",
+        "Header HSTS tidak ditemukan"
+      ],
+      "label": "api",
+      "ok": false,
+      "tls_version": null
+    },
+    {
+      "https_ok": false,
+      "cert_expires": null,
+      "http_redirects_https": false,
+      "host": "www.api.kakiempat.com",
+      "hsts": false,
+      "errors": [
+        "HTTPS status 000",
+        "HTTP probe failed: Cannot index into a null array.",
+        "Header HSTS tidak ditemukan"
+      ],
+      "label": "api_www",
+      "ok": false,
+      "tls_version": null
+    }
+  ],
+  "checked_at": "2026-06-07T08:44:26.4220108Z"
+}

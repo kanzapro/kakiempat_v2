@@ -1,0 +1,31 @@
+﻿{
+    "cors_missing":  [
+
+                     ],
+    "checks":  {
+                   "htaccess_https":  true,
+                   "no_firebase_lib":  true,
+                   "index_ok":  true,
+                   "health_ok":  true,
+                   "gitignore_env":  true,
+                   "no_firebase_pubspec":  true,
+                   "gitignore_credentials":  true,
+                   "htaccess_denies_mysql":  true,
+                   "htaccess_exists":  true,
+                   "cors_all_domains":  true,
+                   "cors_preflight_owner":  true
+               },
+    "cors_preflight_code":  "204",
+    "warnings":  [
+
+                 ],
+    "api_base":  "https://api.kakiempat.com",
+    "health":  {
+                   "ok":  true,
+                   "service":  "kakiempat_v2_api",
+                   "version":  "0.2.0",
+                   "mysql_ok":  true,
+                   "ts":  "2026-06-06T08:29:35+00:00"
+               },
+    "checked_at":  "2026-06-06T08:29:33.4605368Z"
+}

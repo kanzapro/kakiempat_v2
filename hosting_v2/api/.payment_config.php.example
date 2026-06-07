@@ -1,0 +1,9 @@
+<?php
+/** Salin ke .payment_config.php — jangan commit. */
+return [
+    'seabank_account_number' => '1234567890',
+    'seabank_account_name' => 'Kaki Empat PT',
+    'bank_label' => 'SeaBank Indonesia',
+    'platform_fee_owner_percent' => 0.05,
+    'platform_fee_sitter_percent' => 0.08,
+];
