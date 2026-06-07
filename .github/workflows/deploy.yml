@@ -55,10 +55,11 @@ jobs:
         run: |
           chmod +x scripts/ci/cpanel_curl_retry.sh
           encoded_dir=$(python3 -c "import urllib.parse; print(urllib.parse.quote('/home/kakiempa/api.kakiempat.com'))")
-          resp=$(bash scripts/ci/cpanel_curl_retry.sh \
-            "Fileman/save_file_content?dir=${encoded_dir}&file=git_deploy_hook.php&content@hosting/api.kakiempat.com/git_deploy_hook.php" 8)
-          echo "$resp"
-          echo "$resp" | grep -q '"status":1'
+          for f in git_deploy_hook.php deploy_hook_v2.php; do
+            bash scripts/ci/cpanel_curl_retry.sh \
+              "Fileman/save_file_content?dir=${encoded_dir}&file=${f}&content@hosting/api.kakiempat.com/deploy_hook_v2.php" 5 | tee /tmp/upload.json
+            grep -q '"status":1' /tmp/upload.json
+          done
 
       - name: Tulis deploy config di server
         env:
@@ -74,7 +75,7 @@ jobs:
           DEPLOY_SECRET: ${{ secrets.GIT_DEPLOY_SECRET }}
         run: |
           code=$(curl -sS -o /tmp/ping.json -w "%{http_code}" --max-time 60 \
-            "https://api.kakiempat.com/git_deploy_hook.php?action=ping&secret=${DEPLOY_SECRET}" || echo "000")
+            "https://api.kakiempat.com/deploy_hook_v2.php?action=ping&secret=${DEPLOY_SECRET}" || echo "000")
           echo "ping HTTP $code"; cat /tmp/ping.json || true
           grep -q '"ok":true' /tmp/ping.json
 
@@ -85,7 +86,7 @@ jobs:
         run: |
           code=$(curl -sS -o /tmp/hook.json -w "%{http_code}" --max-time 600 \
             -H "X-Deploy-Secret: ${DEPLOY_SECRET}" \
-            "https://api.kakiempat.com/git_deploy_hook.php?branch=${BRANCH}&secret=${DEPLOY_SECRET}" || echo "000")
+            "https://api.kakiempat.com/deploy_hook_v2.php?branch=${BRANCH}&secret=${DEPLOY_SECRET}" || echo "000")
           echo "deploy HTTP $code"
           cat /tmp/hook.json || true
           grep -q '"ok":true' /tmp/hook.json
