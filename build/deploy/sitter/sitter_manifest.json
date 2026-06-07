@@ -1,11 +1,11 @@
-﻿{
-    "target":  "sitter",
-    "url":  "https://sitter.kakiempat.com",
-    "docroot":  "sitter.kakiempat.com",
-    "api_base_url":  "https://www.api.kakiempat.com",
-    "built_at":  "2026-06-07T10:56:51.3920164Z",
-    "git":  "b80500f",
-    "web_renderer":  "html",
-    "zip":  null,
-    "notes":  "Routing subdomain via domain_router.dart (hostname runtime)."
+{
+  "target": "sitter",
+  "url": "https://sitter.kakiempat.com",
+  "docroot": "sitter.kakiempat.com",
+  "api_base_url": "https://www.api.kakiempat.com",
+  "built_at": "2026-06-07T11:01:32.9135203Z",
+  "git": "fde6c88",
+  "web_renderer": "html",
+  "zip": null,
+  "notes": "Routing subdomain via domain_router.dart (hostname runtime)."
 }

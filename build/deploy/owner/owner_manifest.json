@@ -1,11 +1,11 @@
-﻿{
-    "target":  "owner",
-    "url":  "https://owner.kakiempat.com",
-    "docroot":  "owner.kakiempat.com",
-    "api_base_url":  "https://www.api.kakiempat.com",
-    "built_at":  "2026-06-07T10:56:51.1597271Z",
-    "git":  "b80500f",
-    "web_renderer":  "html",
-    "zip":  null,
-    "notes":  "Routing subdomain via domain_router.dart (hostname runtime)."
+{
+  "target": "owner",
+  "url": "https://owner.kakiempat.com",
+  "docroot": "owner.kakiempat.com",
+  "api_base_url": "https://www.api.kakiempat.com",
+  "built_at": "2026-06-07T11:01:32.6527665Z",
+  "git": "fde6c88",
+  "web_renderer": "html",
+  "zip": null,
+  "notes": "Routing subdomain via domain_router.dart (hostname runtime)."
 }
