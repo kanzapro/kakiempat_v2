@@ -1,12 +1,10 @@
-# Deploy Kaki Empat v2 — git pull dari dalam server via HTTPS webhook (bypass FTP + timeout UAPI 5s).
+# Deploy Kaki Empat v2 — tanpa FTP. Picu git pull dari server via health.php (port 443).
 
 name: 🚀 Kaki Empat v2 Git-Pull Deployment (No-FTP Bypass)
 
 on:
   push:
-    branches:
-      - main
-      - master
+    branches: [main, master]
   workflow_dispatch:
 
 concurrency:
@@ -16,82 +14,62 @@ concurrency:
 env:
   CPANEL_HOST: kakiempat.com
   CPANEL_USER: kakiempa
-  CPANEL_REPO_PATH: /home/kakiempa/repo_kakiempat
 
 jobs:
-  trigger-cpanel:
-    name: ⚡ Trigger cPanel Auto Deployment
+  deploy:
+    name: ⚡ Deploy via server webhook
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Validasi secrets
         run: |
-          for s in FTP_USERNAME FTP_PASSWORD GIT_DEPLOY_SECRET; do
-            if [[ -z "${!s:-}" ]]; then
-              echo "::error::Secret $s belum diisi"
-              exit 1
-            fi
-          done
-        env:
-          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
-          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
-          GIT_DEPLOY_SECRET: ${{ secrets.GIT_DEPLOY_SECRET }}
+          test -n "${{ secrets.FTP_PASSWORD }}"
+          test -n "${{ secrets.GIT_DEPLOY_SECRET }}"
 
-      - name: Provision cPanel Git repo (sekali, idempotent)
+      - name: Provision repo Git (idempotent)
         env:
           CPANEL_PASS: ${{ secrets.FTP_PASSWORD }}
           CPANEL_REPO_PATH: ${{ secrets.CPANEL_REPO_PATH }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
-          chmod +x scripts/ci/cpanel_curl_retry.sh scripts/ci/provision_cpanel_git.sh
+          chmod +x scripts/ci/*.sh
           bash scripts/ci/provision_cpanel_git.sh || true
 
-      - name: Upload deploy hook ke API
-        env:
-          CPANEL_PASS: ${{ secrets.FTP_PASSWORD }}
-        run: |
-          chmod +x scripts/ci/cpanel_upload_file.sh
-          for f in git_deploy_hook.php deploy_hook_v2.php; do
-            scripts/ci/cpanel_upload_file.sh /home/kakiempa/api.kakiempat.com "$f" hosting/api.kakiempat.com/deploy_hook_v2.php
-          done
-
-      - name: Tulis deploy config di server
+      - name: Bootstrap secret + config (UAPI GET)
         env:
           CPANEL_PASS: ${{ secrets.FTP_PASSWORD }}
           CPANEL_REPO_PATH: ${{ secrets.CPANEL_REPO_PATH }}
           GIT_DEPLOY_SECRET: ${{ secrets.GIT_DEPLOY_SECRET }}
-        run: |
-          chmod +x scripts/ci/bootstrap_deploy_hook.sh
-          bash scripts/ci/bootstrap_deploy_hook.sh
+        run: bash scripts/ci/bootstrap_deploy_hook.sh || true
 
-      - name: Ping webhook
+      - name: Upload health.php (deploy trigger)
         env:
-          DEPLOY_SECRET: ${{ secrets.GIT_DEPLOY_SECRET }}
+          CPANEL_PASS: ${{ secrets.FTP_PASSWORD }}
         run: |
-          code=$(curl -sS -o /tmp/ping.json -w "%{http_code}" --max-time 60 \
-            "https://api.kakiempat.com/deploy_hook_v2.php?action=ping&secret=${DEPLOY_SECRET}" || echo "000")
-          echo "ping HTTP $code"; cat /tmp/ping.json || true
-          grep -q '"ok":true' /tmp/ping.json
+          chmod +x scripts/ci/cpanel_upload_file.sh
+          scripts/ci/cpanel_upload_file.sh /home/kakiempa/api.kakiempat.com health.php hosting/api.kakiempat.com/health.php || \
+          scripts/ci/cpanel_curl_retry.sh "Fileman/save_file_content?dir=%2Fhome%2Fkakiempa%2Fapi.kakiempat.com&file=health.php&content=$(python3 -c "import urllib.parse; print(urllib.parse.quote(open('hosting/api.kakiempat.com/health.php').read()))")" 3 || true
 
-      - name: 🌐 Git pull + deploy via webhook (localhost UAPI)
+      - name: 🌐 Trigger deploy
         env:
           DEPLOY_SECRET: ${{ secrets.GIT_DEPLOY_SECRET }}
           BRANCH: ${{ github.ref_name }}
         run: |
-          code=$(curl -sS -o /tmp/hook.json -w "%{http_code}" --max-time 600 \
-            -H "X-Deploy-Secret: ${DEPLOY_SECRET}" \
-            "https://api.kakiempat.com/deploy_hook_v2.php?branch=${BRANCH}&secret=${DEPLOY_SECRET}" || echo "000")
-          echo "deploy HTTP $code"
-          cat /tmp/hook.json || true
-          grep -q '"ok":true' /tmp/hook.json
+          for attempt in $(seq 1 8); do
+            for url in https://api.kakiempat.com/health.php https://www.api.kakiempat.com/health.php; do
+              code=$(curl -sS -o /tmp/out.json -w "%{http_code}" --max-time 300 \
+                -H "X-Deploy-Secret: ${DEPLOY_SECRET}" \
+                "${url}?action=deploy&branch=${BRANCH}&secret=${DEPLOY_SECRET}" || echo "000")
+              echo "attempt $attempt $url HTTP $code"
+              cat /tmp/out.json || true
+              if grep -q '"ok":true' /tmp/out.json 2>/dev/null; then exit 0; fi
+            done
+            sleep 45
+          done
+          echo "::error::Deploy gagal — buka cPanel Git > Update from Remote sekali, lalu push ulang"
+          exit 1
 
-      - name: Verifikasi API health
-        run: |
-          sleep 15
-          curl -sS --max-time 30 "https://www.api.kakiempat.com/health.php" || true
-
-      - name: Ringkasan
-        run: echo "Deploy selesai."
+      - name: Verifikasi health
+        run: curl -sS --max-time 30 https://api.kakiempat.com/health.php | grep mysql_ok
