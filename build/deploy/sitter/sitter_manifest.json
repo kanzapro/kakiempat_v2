@@ -3,8 +3,8 @@
     "url":  "https://sitter.kakiempat.com",
     "docroot":  "sitter.kakiempat.com",
     "api_base_url":  "https://www.api.kakiempat.com",
-    "built_at":  "2026-06-07T10:54:48.5024682Z",
-    "git":  "ac72205",
+    "built_at":  "2026-06-07T10:56:51.3920164Z",
+    "git":  "b80500f",
     "web_renderer":  "html",
     "zip":  null,
     "notes":  "Routing subdomain via domain_router.dart (hostname runtime)."
