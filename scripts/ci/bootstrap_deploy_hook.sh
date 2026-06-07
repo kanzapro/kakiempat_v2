@@ -29,11 +29,13 @@ PHP
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 TRIGGER="$ROOT/hosting/api.kakiempat.com/deploy_trigger.php"
+GET_UPLOAD="$(dirname "$0")/cpanel_upload_file_get.sh"
+chmod +x "$GET_UPLOAD"
 
 export CPANEL_PASS CPANEL_TOKEN
 "$UPLOAD" "$API_DIR" ".git_deploy_secret" "$TMP_SECRET"
 "$UPLOAD" "$API_DIR" ".git_deploy_config.php" "$TMP_CONFIG"
 if [[ -f "$TRIGGER" ]]; then
-  "$UPLOAD" "$API_DIR" "deploy_trigger.php" "$TRIGGER"
+  "$GET_UPLOAD" "$API_DIR" "deploy_trigger.php" "$TRIGGER" || true
 fi
 echo "Bootstrap deploy config OK"
