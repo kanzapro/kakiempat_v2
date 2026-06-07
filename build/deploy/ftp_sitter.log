@@ -1,8 +1,0 @@
-=== Kaki Empat v2 - deploy web ===
-Targets: sitter
-API: https://www.api.kakiempat.com
-
-Packaging per subdomain ...
-  sitter -> D:\Project_Flutter\kakiempat_v2\build\deploy\sitter
-    Manifest: D:\Project_Flutter\kakiempat_v2\build\deploy\sitter\sitter_manifest.json
-FTP upload sitter (sitter.kakiempat.com via 178.83.188.195) - 42 files ...

@@ -1,9 +1,0 @@
-=== Kaki Empat v2 - deploy web ===
-Targets: owner
-API: https://www.api.kakiempat.com
-Money engine: owner.kakiempat.com (prioritas UX + stabilitas)
-
-Packaging per subdomain ...
-  owner -> D:\Project_Flutter\kakiempat_v2\build\deploy\owner
-    Manifest: D:\Project_Flutter\kakiempat_v2\build\deploy\owner\owner_manifest.json
-FTP upload owner (owner.kakiempat.com via 178.83.188.195) - 42 files ...

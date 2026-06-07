@@ -35,6 +35,13 @@ migrate_working_dir/
 !/build/deploy/**
 !/build/deploy_api/
 !/build/deploy_api/**
+build/deploy_api/.mysql_v2.php
+build/deploy_api/.migrate_v2_secret
+build/deploy_api/.agent_telemetry_secret
+build/deploy_api/.payment_webhook_secret
+build/deploy_api/.payment_config.php
+build/deploy_api/.notifications_path.php
+build/deploy/ftp_*.log
 /coverage/
 
 # Symbolication related

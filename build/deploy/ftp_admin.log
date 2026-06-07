@@ -1,8 +1,0 @@
-=== Kaki Empat v2 - deploy web ===
-Targets: admin
-API: https://www.api.kakiempat.com
-
-Packaging per subdomain ...
-  admin -> D:\Project_Flutter\kakiempat_v2\build\deploy\admin
-    Manifest: D:\Project_Flutter\kakiempat_v2\build\deploy\admin\admin_manifest.json
-FTP upload admin (admin.kakiempat.com via 178.83.188.195) - 42 files ...
