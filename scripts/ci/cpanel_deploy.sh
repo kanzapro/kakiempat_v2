@@ -27,6 +27,12 @@ rsync -a --delete \
   "$ROOT/build/deploy_api/" "$HOME_CP/api.kakiempat.com/"
 echo "OK api -> api.kakiempat.com/"
 
+# Owner BFF parsial — overlay tanpa --delete (menang atas deploy_api stale)
+if [[ -d "$ROOT/build/deploy_api_owner" ]]; then
+  rsync -a "$ROOT/build/deploy_api_owner/" "$HOME_CP/api.kakiempat.com/"
+  echo "OK api owner overlay -> api.kakiempat.com/ (owner_v2.php + lib)"
+fi
+
 declare -A WEB_DOCROOTS=(
   [www]=public_html
   [owner]=owner.kakiempat.com
@@ -44,6 +50,11 @@ for target in www owner sitter admin staging; do
   dest="$HOME_CP/${WEB_DOCROOTS[$target]}/"
   rsync -a --delete "$src/" "$dest"
   echo "OK $target -> ${WEB_DOCROOTS[$target]}/"
+  if [[ "$target" == "www" ]]; then
+    www_sub="$HOME_CP/www.kakiempat.com/"
+    rsync -a --delete "$src/" "$www_sub"
+    echo "OK www -> www.kakiempat.com/"
+  fi
 done
 
 echo "=== cPanel deploy selesai ==="

@@ -3,8 +3,9 @@
     "url":  "https://www.kakiempat.com",
     "docroot":  "public_html",
     "api_base_url":  "https://www.api.kakiempat.com",
-    "built_at":  "2026-06-07T10:54:50.1227446Z",
-    "git":  "ac72205",
+    "launch_phase":  "full",
+    "built_at":  "2026-06-07T11:39:33.0781156Z",
+    "git":  "876f27c",
     "web_renderer":  "html",
     "zip":  null,
     "notes":  "Routing subdomain via domain_router.dart (hostname runtime)."
