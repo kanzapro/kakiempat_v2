@@ -1,0 +1,3 @@
+# App subdomain - block search engine indexing
+User-agent: *
+Disallow: /

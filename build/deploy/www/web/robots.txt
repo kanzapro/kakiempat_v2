@@ -1,0 +1,5 @@
+# www.kakiempat.com - landing marketing (allow indexing)
+User-agent: *
+Allow: /
+
+Sitemap: https://www.kakiempat.com/sitemap.xml

@@ -1,0 +1,11 @@
+﻿{
+    "target":  "sitter",
+    "url":  "https://sitter.kakiempat.com",
+    "docroot":  "sitter.kakiempat.com",
+    "api_base_url":  "https://www.api.kakiempat.com",
+    "built_at":  "2026-06-07T09:37:21.1984774Z",
+    "git":  "17ded76",
+    "web_renderer":  "html",
+    "zip":  null,
+    "notes":  "Routing subdomain via domain_router.dart (hostname runtime)."
+}
