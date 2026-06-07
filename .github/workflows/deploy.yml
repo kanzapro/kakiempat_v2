@@ -44,30 +44,24 @@ jobs:
           GIT_DEPLOY_SECRET: ${{ secrets.GIT_DEPLOY_SECRET }}
         run: bash scripts/ci/bootstrap_deploy_hook.sh || true
 
-      - name: Upload health.php (deploy trigger)
-        env:
-          CPANEL_PASS: ${{ secrets.FTP_PASSWORD }}
-        run: |
-          chmod +x scripts/ci/cpanel_upload_file.sh
-          scripts/ci/cpanel_upload_file.sh /home/kakiempa/api.kakiempat.com health.php hosting/api.kakiempat.com/health.php
-
-      - name: 🌐 Trigger deploy
+      - name: 🌐 Trigger deploy (deploy_trigger.php via bootstrap)
         env:
           DEPLOY_SECRET: ${{ secrets.GIT_DEPLOY_SECRET }}
           BRANCH: ${{ github.ref_name }}
         run: |
-          for attempt in $(seq 1 8); do
-            for url in https://api.kakiempat.com/health.php https://www.api.kakiempat.com/health.php; do
+          for attempt in $(seq 1 10); do
+            for url in https://api.kakiempat.com/deploy_trigger.php https://www.api.kakiempat.com/deploy_trigger.php; do
               code=$(curl -sS -o /tmp/out.json -w "%{http_code}" --max-time 300 \
                 -H "X-Deploy-Secret: ${DEPLOY_SECRET}" \
-                "${url}?action=deploy&branch=${BRANCH}&secret=${DEPLOY_SECRET}" || echo "000")
+                "${url}?branch=${BRANCH}&secret=${DEPLOY_SECRET}" || echo "000")
               echo "attempt $attempt $url HTTP $code"
               cat /tmp/out.json || true
-              if grep -q '"http":' /tmp/out.json 2>/dev/null && grep -q '"ok":true' /tmp/out.json 2>/dev/null; then exit 0; fi
+              if grep -q '"ok":true' /tmp/out.json 2>/dev/null && grep -q '"http":200' /tmp/out.json 2>/dev/null; then exit 0; fi
+              if grep -q '"status":1' /tmp/out.json 2>/dev/null && grep -q '"ok":true' /tmp/out.json 2>/dev/null; then exit 0; fi
             done
-            sleep 45
+            sleep 30
           done
-          echo "::error::Deploy gagal — buka cPanel Git > Update from Remote sekali, lalu push ulang"
+          echo "::error::Deploy gagal — cek cPanel Git > Update from Remote"
           exit 1
 
       - name: Verifikasi health

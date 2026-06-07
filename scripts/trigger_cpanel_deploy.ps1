@@ -1,8 +1,7 @@
-# Picu git pull + .cpanel.yml di server via cPanel VersionControl API (tanpa FTP).
+# Picu git pull + .cpanel.yml di server via deploy_trigger.php (port 443, tanpa FTP/2083).
 param(
-    [string]$RepoPath = '/home/kakiempa/repo_kakiempat',
     [string]$Branch = 'main',
-    [string]$CpanelHost = 'kakiempat.com'
+    [string]$ApiBase = 'https://api.kakiempat.com'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -19,29 +18,21 @@ function Get-IniValue($text, $section, $key) {
     return $null
 }
 
-$token = $env:CPANEL_API_TOKEN
-$user = 'kakiempa'
-if (Test-Path $credPath) {
+$secret = $env:GIT_DEPLOY_SECRET
+if (-not $secret -and (Test-Path $credPath)) {
     $ini = Get-Content $credPath -Raw
-    $user = Get-IniValue $ini 'cpanel' 'username'
-    if (-not $token) { $token = Get-IniValue $ini 'cpanel' 'api_token' }
+    $secret = Get-IniValue $ini 'git_deploy' 'secret'
 }
-if (-not $token) {
-    throw 'CPANEL_API_TOKEN tidak ditemukan. Set env CPANEL_API_TOKEN atau cpanel.api_token di hosting.credentials'
+if (-not $secret) {
+    throw 'GIT_DEPLOY_SECRET tidak ditemukan. Set env GIT_DEPLOY_SECRET atau [git_deploy] secret di hosting.credentials'
 }
 
-$encodedRepo = [uri]::EscapeDataString($RepoPath)
-$encodedBranch = [uri]::EscapeDataString($Branch)
-$url = "https://${CpanelHost}:2083/execute/VersionControl/update?repository_root=${encodedRepo}&branch=${encodedBranch}"
-
-Write-Host "Memicu cPanel deploy: $RepoPath (branch=$Branch)" -ForegroundColor Cyan
-$out = curl.exe -sS -w "`nHTTP:%{http_code}" `
-    -H "Authorization: cpanel ${user}:${token}" `
-    -H 'Accept: application/json' `
-    $url
+$url = "${ApiBase}/deploy_trigger.php?branch=$([uri]::EscapeDataString($Branch))&secret=$([uri]::EscapeDataString($secret))"
+Write-Host "Memicu deploy: $url" -ForegroundColor Cyan
+$out = curl.exe -sS -w "`nHTTP:%{http_code}" --max-time 300 -H "X-Deploy-Secret: $secret" $url
 Write-Host $out
 
-if ($out -notmatch 'HTTP:200' -or $out -notmatch '"status":1') {
-    throw 'cPanel VersionControl/update gagal — cek token dan path repo di cPanel Git Version Control'
+if ($out -notmatch 'HTTP:200' -or $out -notmatch '"ok":true') {
+    throw 'deploy_trigger.php gagal — pastikan bootstrap_deploy_hook sudah jalan di GitHub Actions'
 }
-Write-Host 'OK — cPanel akan git pull lalu menjalankan .cpanel.yml' -ForegroundColor Green
+Write-Host 'OK — server git pull + .cpanel.yml' -ForegroundColor Green

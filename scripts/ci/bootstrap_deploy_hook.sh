@@ -27,7 +27,13 @@ return [
 ];
 PHP
 
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+TRIGGER="$ROOT/hosting/api.kakiempat.com/deploy_trigger.php"
+
 export CPANEL_PASS CPANEL_TOKEN
 "$UPLOAD" "$API_DIR" ".git_deploy_secret" "$TMP_SECRET"
 "$UPLOAD" "$API_DIR" ".git_deploy_config.php" "$TMP_CONFIG"
+if [[ -f "$TRIGGER" ]]; then
+  "$UPLOAD" "$API_DIR" "deploy_trigger.php" "$TRIGGER"
+fi
 echo "Bootstrap deploy config OK"

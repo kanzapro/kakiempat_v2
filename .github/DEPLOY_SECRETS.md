@@ -35,6 +35,7 @@ FTP/SFTP **diblokir** firewall hosting. Deploy hanya lewat **git push → cPanel
 | `FTP_PASSWORD` | Password cPanel | Sudah ada |
 | `REPO_CLONE_TOKEN` | GitHub PAT/OAuth untuk clone private repo | Sudah ada |
 | `CPANEL_REPO_PATH` | `/home/kakiempa/repo_kakiempat` | Sudah ada |
+| `GIT_DEPLOY_SECRET` | Secret untuk `deploy_trigger.php` | Wajib |
 | `CPANEL_API_TOKEN` | (opsional) API token cPanel — lebih aman dari password | Opsional |
 
 ## 3. Cara deploy (solo dev)
@@ -46,15 +47,14 @@ git commit -m "deploy: <deskripsi>"
 git push origin main
 ```
 
-GitHub Actions memanggil:
+GitHub Actions:
 
-```http
-GET https://kakiempat.com:2083/execute/VersionControl/update
-  ?repository_root=/home/kakiempa/repo_kakiempat&branch=main
-Authorization: cpanel kakiempa:<CPANEL_API_TOKEN>
-```
+1. Bootstrap `deploy_trigger.php` + secret ke `api.kakiempat.com/` (UAPI Fileman, file kecil)
+2. Panggil `https://api.kakiempat.com/deploy_trigger.php?secret=...&branch=main` (port 443)
+3. Server memanggil `VersionControl/update` via localhost:2083 (timeout 300s, aman dari firewall)
+4. cPanel menjalankan `scripts/ci/cpanel_deploy.sh` via `.cpanel.yml`
 
-cPanel menjalankan `scripts/ci/cpanel_deploy.sh` via `.cpanel.yml`.
+Manual lokal: `.\scripts\trigger_cpanel_deploy.ps1` (butuh `GIT_DEPLOY_SECRET`, bukan port 2083).
 
 ## 4. File yang tidak di-rsync ke produksi
 
