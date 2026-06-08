@@ -7,15 +7,82 @@ require_once __DIR__ . '/kakiempat_sitter_v2.php';
 require_once __DIR__ . '/kakiempat_platform_fee_v2.php';
 require_once __DIR__ . '/kakiempat_event_notifications.php';
 
+function kakiempat_booking_v2_normalize_status(string $status): string
+{
+    $compact = strtolower(str_replace(['_', '-'], '', trim($status)));
+
+    return match ($compact) {
+        'awaitingpayment' => 'awaiting_payment',
+        'pendingverification' => 'pending_verification',
+        'paymentrejected' => 'payment_rejected',
+        'paid' => 'paid',
+        default => strtolower(trim($status)),
+    };
+}
+
+function kakiempat_booking_v2_status_is(string $actual, string $expected): bool
+{
+    return kakiempat_booking_v2_normalize_status($actual)
+        === kakiempat_booking_v2_normalize_status($expected);
+}
+
+/** @param array<string, mixed> $formatted
+ * @return array<string, mixed>
+ */
+function kakiempat_booking_v2_enrich_pets(PDO $pdo, array $formatted): array
+{
+    $petIds = $formatted['pet_ids'] ?? [];
+    if (!is_array($petIds) || $petIds === []) {
+        $formatted['pet_names'] = [];
+        $formatted['pet_species'] = [];
+
+        return $formatted;
+    }
+
+    $placeholders = implode(',', array_fill(0, count($petIds), '?'));
+    $stmt = $pdo->prepare(
+        "SELECT id, name, species FROM kakiempa_v2_pets WHERE id IN ({$placeholders})",
+    );
+    $stmt->execute(array_values($petIds));
+    $namesById = [];
+    $speciesById = [];
+    while ($petRow = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        if (!is_array($petRow)) {
+            continue;
+        }
+        $key = (string) ($petRow['id'] ?? '');
+        $namesById[$key] = (string) ($petRow['name'] ?? '');
+        $speciesById[$key] = (string) ($petRow['species'] ?? '');
+    }
+
+    $petNames = [];
+    $petSpecies = [];
+    foreach ($petIds as $petId) {
+        $key = (string) $petId;
+        if ($key === '') {
+            continue;
+        }
+        if (isset($namesById[$key]) && $namesById[$key] !== '') {
+            $petNames[] = $namesById[$key];
+        }
+        if (isset($speciesById[$key]) && $speciesById[$key] !== '') {
+            $petSpecies[] = $speciesById[$key];
+        }
+    }
+    $formatted['pet_names'] = $petNames;
+    $formatted['pet_species'] = $petSpecies;
+
+    return $formatted;
+}
+
 /** @return list<string> */
 function kakiempat_booking_v2_cancellable_statuses(): array
 {
     return [
         'pending',
-        'awaitingPayment',
-        'AWAITING_PAYMENT',
-        'PENDING_VERIFICATION',
-        'PAID',
+        'awaiting_payment',
+        'pending_verification',
+        'paid',
         'confirmed',
         'en_route',
         'in_progress',
@@ -167,7 +234,7 @@ function kakiempat_booking_v2_accept_request(array $body): void
         if ($paymentAmount <= 0 && $totalPrice > 0) {
             $paymentAmount = kakiempat_platform_fee_v2_owner_payment_amount($totalPrice);
         }
-        $bookingStatus = $paymentAmount > 0 ? 'awaitingPayment' : 'pending';
+        $bookingStatus = $paymentAmount > 0 ? 'awaiting_payment' : 'pending';
 
         $pdo->prepare(
             'INSERT INTO kakiempa_v2_bookings
@@ -236,14 +303,14 @@ function kakiempat_booking_v2_get_booking(): void
     $booking = kakiempat_booking_v2_fetch_booking($pdo, $bookingId);
     kakiempat_booking_v2_assert_can_view($auth, $booking);
 
-    v2ApiRespondData(['booking' => kakiempat_booking_v2_format_booking($booking)]);
+    v2ApiRespondData(['booking' => kakiempat_booking_v2_format_booking($booking, $pdo)]);
 }
 
 /** @return list<array<string, mixed>> */
 function kakiempat_booking_v2_fetch_owner_bookings(PDO $pdo, int $ownerUserId): array
 {
     $stmt = $pdo->prepare(
-        'SELECT b.*, r.service_code, r.scheduled_at, r.notes
+        'SELECT b.*, r.service_code, r.scheduled_at, r.notes, r.pet_ids
          FROM kakiempa_v2_bookings b
          LEFT JOIN kakiempa_v2_requests r ON r.id = b.request_id
          WHERE b.owner_user_id = ?
@@ -254,7 +321,7 @@ function kakiempat_booking_v2_fetch_owner_bookings(PDO $pdo, int $ownerUserId): 
     $bookings = [];
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
         if (is_array($row)) {
-            $bookings[] = kakiempat_booking_v2_format_booking($row);
+            $bookings[] = kakiempat_booking_v2_format_booking($row, $pdo);
         }
     }
 
@@ -270,7 +337,7 @@ function kakiempat_booking_v2_list_my_bookings(): void
         $bookings = kakiempat_booking_v2_fetch_owner_bookings($pdo, $auth['user_id']);
     } elseif ($auth['role'] === 'sitter') {
         $stmt = $pdo->prepare(
-            'SELECT b.*, r.service_code, r.scheduled_at, r.notes
+            'SELECT b.*, r.service_code, r.scheduled_at, r.notes, r.pet_ids
              FROM kakiempa_v2_bookings b
              LEFT JOIN kakiempa_v2_requests r ON r.id = b.request_id
              WHERE b.sitter_user_id = ?
@@ -279,7 +346,7 @@ function kakiempat_booking_v2_list_my_bookings(): void
         $stmt->execute([$auth['user_id']]);
     } elseif (v2ApiIsAdmin($auth)) {
         $stmt = $pdo->query(
-            'SELECT b.*, r.service_code, r.scheduled_at, r.notes
+            'SELECT b.*, r.service_code, r.scheduled_at, r.notes, r.pet_ids
              FROM kakiempa_v2_bookings b
              LEFT JOIN kakiempa_v2_requests r ON r.id = b.request_id
              ORDER BY b.created_at DESC
@@ -292,7 +359,7 @@ function kakiempat_booking_v2_list_my_bookings(): void
     if (!isset($bookings)) {
         $bookings = [];
         while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-            $bookings[] = kakiempat_booking_v2_format_booking($row);
+            $bookings[] = kakiempat_booking_v2_format_booking($row, $pdo);
         }
     }
 
@@ -306,7 +373,7 @@ function kakiempat_booking_v2_list_by_owner(): void
     $pdo = v2ApiPdo();
 
     $stmt = $pdo->prepare(
-        'SELECT b.*, r.service_code, r.scheduled_at, r.notes
+        'SELECT b.*, r.service_code, r.scheduled_at, r.notes, r.pet_ids
          FROM kakiempa_v2_bookings b
          LEFT JOIN kakiempa_v2_requests r ON r.id = b.request_id
          WHERE b.owner_user_id = ?
@@ -316,7 +383,7 @@ function kakiempat_booking_v2_list_by_owner(): void
 
     $bookings = [];
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-        $bookings[] = kakiempat_booking_v2_format_booking($row);
+        $bookings[] = kakiempat_booking_v2_format_booking($row, $pdo);
     }
 
     v2ApiRespondData(['bookings' => $bookings, 'total' => count($bookings)]);
@@ -329,7 +396,7 @@ function kakiempat_booking_v2_list_by_sitter(): void
     $pdo = v2ApiPdo();
 
     $stmt = $pdo->prepare(
-        'SELECT b.*, r.service_code, r.scheduled_at, r.notes
+        'SELECT b.*, r.service_code, r.scheduled_at, r.notes, r.pet_ids
          FROM kakiempa_v2_bookings b
          LEFT JOIN kakiempa_v2_requests r ON r.id = b.request_id
          WHERE b.sitter_user_id = ?
@@ -339,7 +406,7 @@ function kakiempat_booking_v2_list_by_sitter(): void
 
     $bookings = [];
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-        $bookings[] = kakiempat_booking_v2_format_booking($row);
+        $bookings[] = kakiempat_booking_v2_format_booking($row, $pdo);
     }
 
     v2ApiRespondData(['bookings' => $bookings, 'total' => count($bookings)]);
@@ -433,13 +500,13 @@ function kakiempat_booking_v2_format_request(array $row): array
         'pet_ids' => $petIds,
         'total_price' => (int) ($row['total_price'] ?? 0),
         'payment_amount' => (int) ($row['payment_amount'] ?? 0),
-        'status' => (string) ($row['status'] ?? ''),
+        'status' => kakiempat_booking_v2_normalize_status((string) ($row['status'] ?? '')),
         'created_at' => (string) ($row['created_at'] ?? ''),
     ];
 }
 
 /** @param array<string, mixed> $row */
-function kakiempat_booking_v2_format_booking(array $row): array
+function kakiempat_booking_v2_format_booking(array $row, ?PDO $pdo = null): array
 {
     $petIds = [];
     if (isset($row['pet_ids']) && $row['pet_ids'] !== null && $row['pet_ids'] !== '') {
@@ -449,13 +516,13 @@ function kakiempat_booking_v2_format_booking(array $row): array
         }
     }
 
-    return [
+    $formatted = [
         'id' => (string) ($row['id'] ?? ''),
         'offer_id' => isset($row['offer_id']) ? (string) $row['offer_id'] : null,
         'request_id' => isset($row['request_id']) ? (string) $row['request_id'] : null,
         'owner_user_id' => isset($row['owner_user_id']) ? (string) $row['owner_user_id'] : null,
         'sitter_user_id' => isset($row['sitter_user_id']) ? (string) $row['sitter_user_id'] : null,
-        'status' => (string) ($row['status'] ?? ''),
+        'status' => kakiempat_booking_v2_normalize_status((string) ($row['status'] ?? '')),
         'total_price' => (int) ($row['total_price'] ?? 0),
         'payment_amount' => (int) ($row['payment_amount'] ?? 0),
         'service_code' => (string) ($row['service_code'] ?? ''),
@@ -464,6 +531,15 @@ function kakiempat_booking_v2_format_booking(array $row): array
         'pet_ids' => $petIds,
         'created_at' => (string) ($row['created_at'] ?? ''),
     ];
+
+    if ($pdo !== null && $petIds !== []) {
+        return kakiempat_booking_v2_enrich_pets($pdo, $formatted);
+    }
+
+    $formatted['pet_names'] = [];
+    $formatted['pet_species'] = [];
+
+    return $formatted;
 }
 
 /** @param array<string, mixed> $body */
@@ -483,7 +559,7 @@ function kakiempat_booking_v2_sitter_confirm(array $body): void
         $booking = kakiempat_booking_v2_fetch_booking_for_update($pdo, $bookingId);
         kakiempat_booking_v2_assert_sitter($auth, $booking);
 
-        $status = strtolower((string) ($booking['status'] ?? ''));
+        $status = kakiempat_booking_v2_normalize_status((string) ($booking['status'] ?? ''));
         $allowed = ['paid', 'pending'];
         if (!in_array($status, $allowed, true)) {
             v2ApiFail(
@@ -653,6 +729,17 @@ function kakiempat_booking_v2_complete_booking(array $body): void
 
         $pdo->commit();
 
+        if (v2ApiTableExists($pdo, 'kakiempa_v2_platform_events')) {
+            require_once __DIR__ . '/kakiempat_platform_v2.php';
+            kakiempat_platform_v2_emit_event($pdo, 'booking.completed', [
+                'booking_id' => (string) $bookingId,
+                'owner_user_id' => (string) ($booking['owner_user_id'] ?? ''),
+                'sitter_user_id' => (string) ($booking['sitter_user_id'] ?? ''),
+                'service_code' => (string) ($booking['service_code'] ?? ''),
+                'payment_amount' => (int) ($booking['payment_amount'] ?? 0),
+            ]);
+        }
+
         v2ApiRespondData([
             'booking_id' => (string) $bookingId,
             'status' => 'completed',
@@ -683,7 +770,7 @@ function kakiempat_booking_v2_cancel_booking(array $body): void
         $booking = kakiempat_booking_v2_fetch_booking_for_update($pdo, $bookingId);
         kakiempat_booking_v2_assert_can_cancel($auth, $booking);
 
-        $status = (string) ($booking['status'] ?? '');
+        $status = kakiempat_booking_v2_normalize_status((string) ($booking['status'] ?? ''));
         if (!in_array($status, kakiempat_booking_v2_cancellable_statuses(), true)) {
             v2ApiFail(
                 'invalid_booking_status',

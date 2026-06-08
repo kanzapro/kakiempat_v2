@@ -553,7 +553,7 @@ function kakiempat_marketplace_v2_accept_offer(array $body): void
         $pdo->prepare("UPDATE kakiempa_v2_requests SET status = 'matched' WHERE id = ?")
             ->execute([(int) $offer['request_id']]);
 
-        $bookingStatus = $paymentAmount > 0 ? 'awaitingPayment' : 'pending';
+        $bookingStatus = $paymentAmount > 0 ? 'awaiting_payment' : 'pending';
         $pdo->prepare(
             'INSERT INTO kakiempa_v2_bookings
                 (offer_id, request_id, owner_user_id, sitter_user_id, status,
@@ -1010,34 +1010,5 @@ function kakiempat_marketplace_v2_format_request(array $row): array
  */
 function kakiempat_marketplace_v2_enrich_request_pets(PDO $pdo, array $formatted): array
 {
-    $petIds = $formatted['pet_ids'] ?? [];
-    if (!is_array($petIds) || $petIds === []) {
-        $formatted['pet_names'] = [];
-
-        return $formatted;
-    }
-
-    $placeholders = implode(',', array_fill(0, count($petIds), '?'));
-    $stmt = $pdo->prepare(
-        "SELECT id, name FROM kakiempa_v2_pets WHERE id IN ({$placeholders})",
-    );
-    $stmt->execute(array_values($petIds));
-    $namesById = [];
-    while ($petRow = $stmt->fetch(PDO::FETCH_ASSOC)) {
-        if (!is_array($petRow)) {
-            continue;
-        }
-        $namesById[(string) ($petRow['id'] ?? '')] = (string) ($petRow['name'] ?? '');
-    }
-
-    $petNames = [];
-    foreach ($petIds as $petId) {
-        $key = (string) $petId;
-        if ($key !== '' && isset($namesById[$key]) && $namesById[$key] !== '') {
-            $petNames[] = $namesById[$key];
-        }
-    }
-    $formatted['pet_names'] = $petNames;
-
-    return $formatted;
+    return kakiempat_booking_v2_enrich_pets($pdo, $formatted);
 }

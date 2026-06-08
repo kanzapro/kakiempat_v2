@@ -4,6 +4,7 @@ import 'package:kaki_empat/core/models/auth_user_v2.dart';
 import 'package:kaki_empat/core/models/v2_domain_models.dart';
 import 'package:kaki_empat/core/services/auth_service_v2.dart';
 import 'package:kaki_empat/core/services/booking_v2_service.dart';
+import 'package:kaki_empat/core/services/owner_v2_service.dart';
 import 'package:kaki_empat/core/services/review_v2_service.dart';
 import 'package:kaki_empat/core/services/v2_api_client.dart';
 import 'package:kaki_empat/core/navigation/v2_page_route.dart';
@@ -30,6 +31,7 @@ class BookingDetailPage extends StatefulWidget {
 class _BookingDetailPageState extends State<BookingDetailPage> {
   BookingV2? _booking;
   AuthUserV2? _user;
+  List<String> _petLabels = [];
   bool _loading = true;
   bool _acting = false;
   bool _hasReview = false;
@@ -63,6 +65,25 @@ class _BookingDetailPageState extends State<BookingDetailPage> {
       ]);
       if (!mounted) return;
       final booking = results[0] as BookingV2;
+      final user = results[1] as AuthUserV2?;
+      var petLabels = <String>[];
+      if (user?.isOwner == true || user?.isFounder == true) {
+        try {
+          final profile = await OwnerV2Service.instance.getProfile();
+          petLabels = booking.petIds
+              .map((id) {
+                for (final pet in profile.pets) {
+                  if (pet.id == id) return pet.name;
+                }
+                return id;
+              })
+              .toList();
+        } catch (_) {
+          petLabels = booking.petIds;
+        }
+      } else if (booking.petIds.isNotEmpty) {
+        petLabels = booking.petIds;
+      }
       ReviewV2? review;
       if (booking.status.toLowerCase() == 'completed') {
         review = await ReviewV2Service.instance.getBookingReview(booking.id);
@@ -70,7 +91,8 @@ class _BookingDetailPageState extends State<BookingDetailPage> {
       if (!mounted) return;
       setState(() {
         _booking = booking;
-        _user = results[1] as AuthUserV2?;
+        _user = user;
+        _petLabels = petLabels;
         _hasReview = review != null;
         _loading = false;
       });
@@ -223,6 +245,12 @@ class _BookingDetailPageState extends State<BookingDetailPage> {
                         label: l10n.bookingDetailAmount,
                         value: V2Formatters.money(booking.paymentAmount),
                       ),
+                      if (_petLabels.isNotEmpty)
+                        _InfoTile(
+                          icon: Icons.pets,
+                          label: l10n.requestDetailPets,
+                          value: _petLabels.join(', '),
+                        ),
                       if (booking.notes.isNotEmpty)
                         _InfoTile(
                           icon: Icons.notes_outlined,

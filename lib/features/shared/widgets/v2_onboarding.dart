@@ -47,8 +47,9 @@ abstract final class V2Onboarding {
     String? prefsKey,
   }) async {
     if (!context.mounted) return;
-    final prefs = prefsKey != null ? await SharedPreferences.getInstance() : null;
     final l10n = AppLocalizations.of(context)!;
+    final prefs = prefsKey != null ? await SharedPreferences.getInstance() : null;
+    if (!context.mounted) return;
     final steps = isOwner
         ? [
             l10n.onboardingOwnerStep1,

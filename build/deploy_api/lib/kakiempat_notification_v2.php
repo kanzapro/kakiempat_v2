@@ -53,6 +53,7 @@ function kakiempat_notification_v2_get_notifications(): void
 
     $page = max(1, (int) ($_GET['page'] ?? 1));
     $limit = (int) ($_GET['limit'] ?? 20);
+    $typeFilter = strtolower(trim((string) ($_GET['type'] ?? '')));
     if ($limit < 1) {
         $limit = 20;
     }
@@ -61,7 +62,13 @@ function kakiempat_notification_v2_get_notifications(): void
     }
     $offset = ($page - 1) * $limit;
 
-    $items = kakiempat_notification_v2_fetch_page($pdo, $auth['user_id'], $limit, $offset);
+    $items = kakiempat_notification_v2_fetch_page(
+        $pdo,
+        $auth['user_id'],
+        $limit,
+        $offset,
+        $typeFilter,
+    );
     $total = kakiempat_notification_v2_count_all($pdo, $auth['user_id']);
     $unread = kakiempat_notification_v2_count_unread($pdo, $auth['user_id']);
 
@@ -123,20 +130,47 @@ function kakiempat_notification_v2_count_all(PDO $pdo, int $userId): int
     return 0;
 }
 
-/** @return list<array<string, mixed>> */
-function kakiempat_notification_v2_fetch_page(PDO $pdo, int $userId, int $limit, int $offset): array
+/** @return list<string> */
+function kakiempat_notification_v2_types_for_filter(string $filter): array
 {
+    return match ($filter) {
+        'booking' => ['booking', 'booking_update', 'offer', 'marketplace'],
+        'payment' => ['payment', 'payment_update'],
+        'chat' => ['chat', 'message'],
+        'loyalty' => ['loyalty', 'wallet', 'withdrawal', 'referral'],
+        default => [],
+    };
+}
+
+/** @return list<array<string, mixed>> */
+function kakiempat_notification_v2_fetch_page(
+    PDO $pdo,
+    int $userId,
+    int $limit,
+    int $offset,
+    string $typeFilter = '',
+): array {
     if (kakiempat_in_app_notifications_table_exists($pdo)) {
-        $stmt = $pdo->prepare(
-            'SELECT id, title, message, booking_id, notification_type, is_read, created_at
-             FROM kakiempa_v2_in_app_notifications
-             WHERE user_id = ?
-             ORDER BY created_at DESC, id DESC
-             LIMIT ? OFFSET ?',
-        );
-        $stmt->bindValue(1, $userId, PDO::PARAM_INT);
-        $stmt->bindValue(2, $limit, PDO::PARAM_INT);
-        $stmt->bindValue(3, $offset, PDO::PARAM_INT);
+        $types = kakiempat_notification_v2_types_for_filter($typeFilter);
+        $sql = 'SELECT id, title, message, booking_id, notification_type, is_read, created_at
+                FROM kakiempa_v2_in_app_notifications
+                WHERE user_id = ?';
+        $params = [$userId];
+        if ($types !== []) {
+            $placeholders = implode(',', array_fill(0, count($types), '?'));
+            $sql .= " AND notification_type IN ($placeholders)";
+            foreach ($types as $t) {
+                $params[] = $t;
+            }
+        }
+        $sql .= ' ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?';
+        $params[] = $limit;
+        $params[] = $offset;
+
+        $stmt = $pdo->prepare($sql);
+        foreach ($params as $i => $value) {
+            $stmt->bindValue($i + 1, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
+        }
         $stmt->execute();
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 

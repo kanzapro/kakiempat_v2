@@ -1,14 +1,15 @@
 import 'package:kaki_empat/l10n/app_localizations.dart';
 
 String bookingStatusLocalized(AppLocalizations l10n, String status) {
-  return switch (status) {
+  final normalized = status.toLowerCase().replaceAll('_', '');
+  return switch (normalized) {
     'open' => l10n.bookingStatusOpen,
     'matched' => l10n.bookingStatusMatched,
     'pending' => l10n.bookingStatusPending,
-    'awaitingPayment' => l10n.bookingStatusAwaitingPayment,
-    'PENDING_VERIFICATION' => l10n.bookingStatusPendingVerification,
-    'PAID' || 'paid' => l10n.bookingStatusPaid,
-    'PAYMENT_REJECTED' => l10n.bookingStatusPaymentRejected,
+    'awaitingpayment' => l10n.bookingStatusAwaitingPayment,
+    'pendingverification' => l10n.bookingStatusPendingVerification,
+    'paid' => l10n.bookingStatusPaid,
+    'paymentrejected' => l10n.bookingStatusPaymentRejected,
     'cancelled' => l10n.bookingStatusCancelled,
     'confirmed' => l10n.bookingStatusConfirmed,
     'en_route' => l10n.bookingStatusEnRoute,

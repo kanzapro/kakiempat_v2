@@ -109,6 +109,63 @@ function kakiempat_service_v2_get_catalog(): void
     v2ApiRespondData(kakiempat_service_v2_build_catalog_payload(v2ApiPdo()));
 }
 
+function kakiempat_service_v2_check_category_supply(): void
+{
+    $auth = v2ApiRequireAuth();
+    v2ApiRequireRole($auth, ['owner', 'founder']);
+    $pdo = v2ApiPdo();
+
+    $category = trim((string) ($_GET['category'] ?? ''));
+    $kecamatan = kakiempat_kecamatan_v2_normalize((string) ($_GET['kecamatan'] ?? ''));
+    if ($category === '') {
+        v2ApiFail('invalid_category', 'category wajib.', 400);
+    }
+    if ($kecamatan === null) {
+        v2ApiFail('invalid_kecamatan', 'kecamatan wajib (Denpasar).', 400);
+    }
+
+    $minSupply = 1;
+    $sitterCount = 0;
+    $businessCount = 0;
+
+    $codesStmt = $pdo->prepare(
+        'SELECT code FROM kakiempa_v2_service_catalog
+         WHERE category = ? AND is_active = 1',
+    );
+    $codesStmt->execute([$category]);
+    $codes = [];
+    while ($row = $codesStmt->fetch(PDO::FETCH_ASSOC)) {
+        if (is_array($row) && !empty($row['code'])) {
+            $codes[] = (string) $row['code'];
+        }
+    }
+
+    foreach ($codes as $code) {
+        $sitterCount += kakiempat_kecamatan_v2_count_sitters($pdo, $kecamatan, $code);
+    }
+
+    if (v2ApiTableExists($pdo, 'kakiempa_v2_business_profiles')) {
+        $bizStmt = $pdo->prepare(
+            "SELECT COUNT(*) FROM kakiempa_v2_business_profiles b
+             INNER JOIN kakiempa_v2_business_locations l ON l.business_id = b.id
+             WHERE b.status = 'approved' AND l.kecamatan = ?",
+        );
+        $bizStmt->execute([$kecamatan]);
+        $businessCount = (int) $bizStmt->fetchColumn();
+    }
+
+    $totalSupply = $sitterCount + $businessCount;
+    v2ApiRespondData([
+        'category' => $category,
+        'kecamatan' => $kecamatan,
+        'sitter_count' => $sitterCount,
+        'business_count' => $businessCount,
+        'total_supply' => $totalSupply,
+        'available' => $totalSupply >= $minSupply,
+        'min_supply' => $minSupply,
+    ]);
+}
+
 function kakiempat_service_v2_is_valid_code(PDO $pdo, string $code): bool
 {
     $stmt = $pdo->prepare(

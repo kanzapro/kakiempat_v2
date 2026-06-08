@@ -22,6 +22,7 @@ class OwnerV2Service {
 
   Future<OwnerProfileResult> saveProfile({
     required String address,
+    required String kecamatan,
     double? latitude,
     double? longitude,
   }) async {
@@ -30,6 +31,7 @@ class OwnerV2Service {
       action: 'save_profile',
       body: {
         'address': address,
+        'kecamatan': kecamatan,
         'latitude': ?latitude,
         'longitude': ?longitude,
       },
@@ -89,6 +91,15 @@ class OwnerV2Service {
       response,
       (body) => PetV2.fromJson(body['pet'] as Map<String, dynamic>),
     );
+  }
+
+  Future<PetTimelineResult> getPetTimeline(String petId) async {
+    final response = await _api.getAuth(
+      _script,
+      action: 'get_pet_timeline',
+      query: {'pet_id': petId},
+    );
+    return _api.parse(response, PetTimelineResult.fromJson);
   }
 
   Future<void> deletePet(String petId) async {

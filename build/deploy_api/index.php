@@ -17,7 +17,7 @@ echo json_encode([
         ],
         'owner_v2.php' => [
             'POST' => ['save_profile', 'add_pet', 'update_pet', 'delete_pet'],
-            'GET' => ['get_profile'],
+            'GET' => ['get_profile', 'get_dashboard', 'get_pet_timeline'],
         ],
         'pet_v2.php' => [
             'POST' => ['create', 'update', 'delete'],
@@ -36,7 +36,7 @@ echo json_encode([
             'GET' => ['get_earnings_report', 'get_achievements', 'list_my_promotions'],
         ],
         'service_v2.php' => [
-            'GET' => ['get_catalog'],
+            'GET' => ['get_catalog', 'check_category_supply'],
         ],
         'booking_v2.php' => [
             'POST' => [
@@ -80,7 +80,12 @@ echo json_encode([
             'POST' => ['submit_payment_proof', 'admin_approve_payment', 'admin_reject_payment'],
         ],
         'partner_v2.php' => [
-            'GET' => ['list_services'],
+            'GET' => ['list_services', 'list_businesses'],
+            'POST' => ['register_business', 'admin_approve_business'],
+        ],
+        'platform_v2.php' => [
+            'GET' => ['admin_list_apps', 'partner_get_booking', 'retry_pending_events'],
+            'POST' => ['admin_create_app', 'admin_approve_app'],
         ],
         'payment_status.php' => ['GET booking payment status'],
         'payment_webhook.php' => ['POST SeaBank forwarder webhook'],
@@ -89,6 +94,6 @@ echo json_encode([
         'get_notifications.php',
         'get_unread_notifications.php',
     ],
-    'migrations' => 'apply_v2_migration.php?secret=...&file=001_core_tables.sql (001–022)',
+    'migrations' => 'apply_v2_migration.php?secret=...&file=001_core_tables.sql (001–026)',
     'cron' => 'cron_reengage_v2.php?secret=... (re-engagement owner >14 hari)',
 ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);

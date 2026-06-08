@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:kaki_empat/core/config/mvp_scope.dart';
 import 'package:kaki_empat/core/formatters/v2_formatters.dart';
 import 'package:kaki_empat/core/models/v2_domain_models.dart';
 import 'package:kaki_empat/core/navigation/v2_page_route.dart';
@@ -46,20 +47,27 @@ class _SitterProfilePageState extends State<SitterProfilePage> {
       _error = null;
     });
     try {
-      final results = await Future.wait([
+      final futures = <Future<Object?>>[
         SitterV2Service.instance.getProfile(),
         ServiceCatalogV2Service.instance.getCatalogItems(),
         BookingV2Service.instance.listMyBookings(),
-        SitterWalletService.instance.getWallet(),
-      ]);
+      ];
+      if (!MvpScope.hideSitterWallet) {
+        futures.add(SitterWalletService.instance.getWallet());
+      }
+      final results = await Future.wait(futures);
       if (!mounted) return;
       final profile = results[0] as SitterProfileResult;
       final catalog = results[1] as List<ServiceCatalogItem>;
+      SitterWalletSummary? wallet;
+      if (!MvpScope.hideSitterWallet && results.length > 3) {
+        wallet = results[3] as SitterWalletSummary;
+      }
       setState(() {
         _profile = profile;
         _serviceLabels = {for (final item in catalog) item.code: item.label};
         _bookingCount = (results[2] as List).length;
-        _wallet = results[3] as SitterWalletSummary;
+        _wallet = wallet;
         _badges = profile.badges.map(SitterBadge.fromJson).toList();
         _averageRating = profile.averageRating;
         _loading = false;
@@ -149,23 +157,25 @@ class _SitterProfilePageState extends State<SitterProfilePage> {
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Card(
-                                child: Padding(
-                                  padding: const EdgeInsets.all(16),
-                                  child: Column(
-                                    children: [
-                                      Text(
-                                        V2Formatters.money(_wallet?.netIncome ?? 0),
-                                        style: Theme.of(context).textTheme.titleMedium,
-                                      ),
-                                      Text(l10n.profileStatsEarnings, textAlign: TextAlign.center),
-                                    ],
+                            if (!MvpScope.hideSitterWallet) ...[
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Card(
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(16),
+                                    child: Column(
+                                      children: [
+                                        Text(
+                                          V2Formatters.money(_wallet?.netIncome ?? 0),
+                                          style: Theme.of(context).textTheme.titleMedium,
+                                        ),
+                                        Text(l10n.profileStatsEarnings, textAlign: TextAlign.center),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
+                            ],
                           ],
                         ),
                         const SizedBox(height: 8),
@@ -191,17 +201,18 @@ class _SitterProfilePageState extends State<SitterProfilePage> {
                             );
                           },
                         ),
-                        ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          leading: const Icon(Icons.account_balance_wallet_outlined),
-                          title: Text(l10n.walletTitle),
-                          trailing: const Icon(Icons.chevron_right),
-                          onTap: () {
-                            Navigator.of(context).push(
-                              V2PageRoute(page: const WalletPage()),
-                            );
-                          },
-                        ),
+                        if (!MvpScope.hideSitterWallet)
+                          ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            leading: const Icon(Icons.account_balance_wallet_outlined),
+                            title: Text(l10n.walletTitle),
+                            trailing: const Icon(Icons.chevron_right),
+                            onTap: () {
+                              Navigator.of(context).push(
+                                V2PageRoute(page: const WalletPage()),
+                              );
+                            },
+                          ),
                         const SizedBox(height: 8),
                         Card(
                           child: ListTile(

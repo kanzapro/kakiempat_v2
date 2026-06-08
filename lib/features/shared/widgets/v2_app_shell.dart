@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:kaki_empat/core/config/mvp_scope.dart';
 import 'package:kaki_empat/core/navigation/v2_page_route.dart';
+import 'package:kaki_empat/core/web/domain_kind.dart';
 import 'package:kaki_empat/features/community/presentation/pet_gallery_page.dart';
 import 'package:kaki_empat/features/community/presentation/stori_feed_page.dart';
 import 'package:kaki_empat/features/help/presentation/tips_articles_page.dart';
@@ -8,12 +9,16 @@ import 'package:kaki_empat/features/owner/presentation/owner_profile_page.dart';
 import 'package:kaki_empat/features/shared/presentation/booking_history_page.dart';
 import 'package:kaki_empat/features/shared/presentation/discover_page.dart';
 import 'package:kaki_empat/features/shared/presentation/notifications_page.dart';
+import 'package:kaki_empat/features/shared/widgets/notification_badge_button.dart';
+import 'package:kaki_empat/features/shared/widgets/v2_app_switcher.dart';
+import 'package:kaki_empat/features/sitter/presentation/promotions_page.dart';
+import 'package:kaki_empat/features/sitter/presentation/sitter_profile_page.dart';
 import 'package:kaki_empat/features/sitter/presentation/wallet_page.dart';
 import 'package:kaki_empat/l10n/app_localizations.dart';
 
 enum V2AppShellRole { owner, sitter }
 
-/// Shell navigasi terpadu super-app (fase [LaunchPhase.full]).
+/// Shell navigasi terpadu super-app (fase [LaunchPhase.growth]+).
 class V2AppShell extends StatefulWidget {
   const V2AppShell({
     super.key,
@@ -31,6 +36,9 @@ class V2AppShell extends StatefulWidget {
 class _V2AppShellState extends State<V2AppShell> {
   int _index = 0;
 
+  WebDomain get _currentDomain =>
+      widget.role == V2AppShellRole.sitter ? WebDomain.sitter : WebDomain.owner;
+
   @override
   Widget build(BuildContext context) {
     if (!MvpScope.showUnifiedAppShell) {
@@ -40,8 +48,17 @@ class _V2AppShellState extends State<V2AppShell> {
     final l10n = AppLocalizations.of(context)!;
     final destinations = _destinations(l10n);
     final safeIndex = _index.clamp(0, destinations.length - 1);
+    final current = destinations[safeIndex];
 
     return Scaffold(
+      appBar: AppBar(
+        title: Text(current.label),
+        actions: [
+          if (MvpScope.showAppSwitcher) V2AppSwitcher(currentDomain: _currentDomain),
+          if (safeIndex != _messagesTabIndex(destinations))
+            const NotificationBadgeButton(),
+        ],
+      ),
       body: IndexedStack(
         index: safeIndex,
         children: destinations.map((d) => d.page).toList(),
@@ -60,6 +77,11 @@ class _V2AppShellState extends State<V2AppShell> {
             .toList(),
       ),
     );
+  }
+
+  int _messagesTabIndex(List<_ShellDestination> destinations) {
+    final messagesLabel = AppLocalizations.of(context)!.appShellMessages;
+    return destinations.indexWhere((d) => d.label == messagesLabel);
   }
 
   List<_ShellDestination> _destinations(AppLocalizations l10n) {
@@ -81,11 +103,13 @@ class _V2AppShellState extends State<V2AppShell> {
       label: l10n.appShellMessages,
       page: const NotificationsPage(),
     );
-    final discover = _ShellDestination(
-      icon: Icons.explore_outlined,
-      selectedIcon: Icons.explore,
-      label: l10n.discoverTitle,
-      page: const DiscoverPage(),
+    final profile = _ShellDestination(
+      icon: Icons.person_outline,
+      selectedIcon: Icons.person,
+      label: l10n.appShellProfile,
+      page: widget.role == V2AppShellRole.sitter
+          ? const SitterProfilePage()
+          : const OwnerProfilePage(),
     );
 
     if (widget.role == V2AppShellRole.sitter) {
@@ -100,12 +124,32 @@ class _V2AppShellState extends State<V2AppShell> {
           ),
         );
       }
-      if (MvpScope.showPartnerDiscover) items.add(discover);
+      if (MvpScope.showPartnerDiscover) {
+        items.add(
+          _ShellDestination(
+            icon: Icons.explore_outlined,
+            selectedIcon: Icons.explore,
+            label: l10n.discoverTitle,
+            page: const DiscoverPage(),
+          ),
+        );
+      }
+      items.add(profile);
       return items;
     }
 
     final items = [home, bookings, messages];
-    if (MvpScope.showPartnerDiscover) items.add(discover);
+    if (MvpScope.showPartnerDiscover) {
+      items.add(
+        _ShellDestination(
+          icon: Icons.explore_outlined,
+          selectedIcon: Icons.explore,
+          label: l10n.discoverTitle,
+          page: const DiscoverPage(),
+        ),
+      );
+    }
+    items.add(profile);
     return items;
   }
 }
@@ -126,11 +170,19 @@ class _ShellDestination {
 
 /// Kartu pintasan ekosistem growth: komunitas, loyalty, tips.
 class V2GrowthHubSection extends StatelessWidget {
-  const V2GrowthHubSection({super.key});
+  const V2GrowthHubSection({
+    super.key,
+    this.role = V2AppShellRole.owner,
+  });
+
+  final V2AppShellRole role;
 
   @override
   Widget build(BuildContext context) {
-    if (MvpScope.hideCommunityFeatures && MvpScope.hideLoyaltyReferral) {
+    final hideCommunity = MvpScope.hideCommunityFeatures;
+    final hideLoyalty = MvpScope.hideLoyaltyReferral;
+    final hidePromo = MvpScope.hideSitterPromotions;
+    if (hideCommunity && hideLoyalty && (role == V2AppShellRole.owner || hidePromo)) {
       return const SizedBox.shrink();
     }
 
@@ -177,13 +229,34 @@ class V2GrowthHubSection extends StatelessWidget {
                     },
                   ),
                 ],
-                if (!MvpScope.hideLoyaltyReferral)
+                if (!MvpScope.hideLoyaltyReferral && role == V2AppShellRole.owner)
                   ActionChip(
                     avatar: const Icon(Icons.stars_outlined, size: 18),
                     label: Text(l10n.loyaltyPointsTitle),
                     onPressed: () {
                       Navigator.of(context).push(
                         V2PageRoute(page: const OwnerProfilePage()),
+                      );
+                    },
+                  ),
+                if (!MvpScope.hideSitterPromotions &&
+                    role == V2AppShellRole.sitter)
+                  ActionChip(
+                    avatar: const Icon(Icons.local_offer_outlined, size: 18),
+                    label: Text(l10n.promoTitle),
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        V2PageRoute(page: const PromotionsPage()),
+                      );
+                    },
+                  ),
+                if (MvpScope.showPartnerDiscover)
+                  ActionChip(
+                    avatar: const Icon(Icons.explore_outlined, size: 18),
+                    label: Text(l10n.discoverTitle),
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        V2PageRoute(page: const DiscoverPage()),
                       );
                     },
                   ),

@@ -503,6 +503,149 @@ function kakiempat_owner_v2_build_recommendations(PDO $pdo, int $userId, array $
     return $items;
 }
 
+function kakiempat_owner_v2_get_pet_timeline(): void
+{
+    $auth = v2ApiRequireAuth();
+    v2ApiRequireRole($auth, ['owner', 'founder']);
+    $pdo = v2ApiPdo();
+    $userId = $auth['user_id'];
+
+    $petId = (int) ($_GET['pet_id'] ?? 0);
+    if ($petId < 1) {
+        v2ApiFail('invalid_pet_id', 'pet_id wajib.', 400);
+    }
+
+    $petStmt = $pdo->prepare(
+        'SELECT id, name, species, breed, age_label, weight_kg, behavior_notes, created_at
+         FROM kakiempa_v2_pets WHERE id = ? AND owner_user_id = ? LIMIT 1',
+    );
+    $petStmt->execute([$petId, $userId]);
+    $petRow = $petStmt->fetch(PDO::FETCH_ASSOC);
+    if (!is_array($petRow)) {
+        v2ApiFail('pet_not_found', 'Hewan tidak ditemukan.', 404);
+    }
+
+    $events = [];
+    $petIdStr = (string) $petId;
+
+    $push = static function (array $event) use (&$events): void {
+        $events[] = $event;
+    };
+
+    $push([
+        'kind' => 'pet_registered',
+        'title' => 'Profil hewan dibuat',
+        'subtitle' => (string) ($petRow['name'] ?? ''),
+        'occurred_at' => (string) ($petRow['created_at'] ?? ''),
+    ]);
+
+    if (trim((string) ($petRow['behavior_notes'] ?? '')) !== '') {
+        $push([
+            'kind' => 'health_note',
+            'title' => 'Catatan perilaku',
+            'subtitle' => (string) $petRow['behavior_notes'],
+            'occurred_at' => (string) ($petRow['created_at'] ?? ''),
+        ]);
+    }
+
+    if (v2ApiTableExists($pdo, 'kakiempa_v2_requests')) {
+        $reqStmt = $pdo->prepare(
+            'SELECT r.id, r.service_code, r.status, r.date_label, r.created_at, r.pet_ids
+             FROM kakiempa_v2_requests r
+             WHERE r.owner_user_id = ?
+             ORDER BY r.created_at DESC
+             LIMIT 50',
+        );
+        $reqStmt->execute([$userId]);
+        while ($row = $reqStmt->fetch(PDO::FETCH_ASSOC)) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $petIds = json_decode((string) ($row['pet_ids'] ?? '[]'), true);
+            if (!is_array($petIds) || !in_array($petIdStr, array_map('strval', $petIds), true)) {
+                continue;
+            }
+            $push([
+                'kind' => 'request',
+                'title' => 'Permintaan layanan',
+                'subtitle' => (string) ($row['service_code'] ?? ''),
+                'status' => (string) ($row['status'] ?? ''),
+                'occurred_at' => (string) ($row['created_at'] ?? ''),
+                'payload' => ['request_id' => (string) ($row['id'] ?? '')],
+            ]);
+        }
+    }
+
+    if (v2ApiTableExists($pdo, 'kakiempa_v2_bookings')) {
+        $bookStmt = $pdo->prepare(
+            'SELECT b.id, b.status, b.service_code, b.created_at, b.updated_at, r.pet_ids
+             FROM kakiempa_v2_bookings b
+             LEFT JOIN kakiempa_v2_requests r ON r.id = b.request_id
+             WHERE b.owner_user_id = ?
+             ORDER BY b.created_at DESC
+             LIMIT 50',
+        );
+        $bookStmt->execute([$userId]);
+        while ($row = $bookStmt->fetch(PDO::FETCH_ASSOC)) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $petIds = json_decode((string) ($row['pet_ids'] ?? '[]'), true);
+            if (!is_array($petIds) || !in_array($petIdStr, array_map('strval', $petIds), true)) {
+                continue;
+            }
+            $push([
+                'kind' => 'booking',
+                'title' => 'Booking',
+                'subtitle' => (string) ($row['service_code'] ?? ''),
+                'status' => (string) ($row['status'] ?? ''),
+                'occurred_at' => (string) ($row['updated_at'] ?? $row['created_at'] ?? ''),
+                'payload' => ['booking_id' => (string) ($row['id'] ?? '')],
+            ]);
+        }
+    }
+
+    if (v2ApiTableExists($pdo, 'kakiempa_v2_pet_gallery')) {
+        $galStmt = $pdo->prepare(
+            'SELECT id, caption, likes_count, created_at
+             FROM kakiempa_v2_pet_gallery
+             WHERE owner_user_id = ? AND pet_id = ?
+             ORDER BY created_at DESC
+             LIMIT 20',
+        );
+        $galStmt->execute([$userId, $petId]);
+        while ($row = $galStmt->fetch(PDO::FETCH_ASSOC)) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $push([
+                'kind' => 'gallery',
+                'title' => 'Foto galeri',
+                'subtitle' => (string) ($row['caption'] ?? 'Tanpa keterangan'),
+                'occurred_at' => (string) ($row['created_at'] ?? ''),
+                'payload' => [
+                    'gallery_id' => (string) ($row['id'] ?? ''),
+                    'likes' => (int) ($row['likes_count'] ?? 0),
+                ],
+            ]);
+        }
+    }
+
+    usort(
+        $events,
+        static fn(array $a, array $b): int => strcmp(
+            (string) ($b['occurred_at'] ?? ''),
+            (string) ($a['occurred_at'] ?? ''),
+        ),
+    );
+
+    v2ApiRespondData([
+        'pet' => kakiempat_owner_v2_format_pet($petRow),
+        'events' => $events,
+        'total' => count($events),
+    ]);
+}
+
 /** @param array<string, mixed> $row */
 function kakiempat_owner_v2_format_pet(array $row): array
 {

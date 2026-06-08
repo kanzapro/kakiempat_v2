@@ -1,3 +1,4 @@
+import 'package:kaki_empat/core/config/denpasar_kecamatan.dart';
 import 'package:kaki_empat/core/models/v2_domain_models.dart';
 import 'package:kaki_empat/core/services/v2_api_client.dart';
 
@@ -60,12 +61,16 @@ class MarketplaceCreateRequestResult {
   const MarketplaceCreateRequestResult({
     required this.requestId,
     this.sitterCountInRadius,
+    this.sitterCountInKecamatan,
+    this.kecamatan,
     this.radiusKm = 7,
     this.message = '',
   });
 
   final String requestId;
   final int? sitterCountInRadius;
+  final int? sitterCountInKecamatan;
+  final String? kecamatan;
   final double radiusKm;
   final String message;
 
@@ -73,6 +78,8 @@ class MarketplaceCreateRequestResult {
     return MarketplaceCreateRequestResult(
       requestId: '${json['request_id'] ?? ''}',
       sitterCountInRadius: (json['sitter_count_in_radius'] as num?)?.toInt(),
+      sitterCountInKecamatan: (json['sitter_count_in_kecamatan'] as num?)?.toInt(),
+      kecamatan: DenpasarKecamatan.normalize('${json['kecamatan'] ?? ''}'),
       radiusKm: (json['radius_km'] as num?)?.toDouble() ?? 7,
       message: '${json['message'] ?? ''}',
     );
@@ -82,16 +89,27 @@ class MarketplaceCreateRequestResult {
 class MarketplaceBroadcastEstimate {
   const MarketplaceBroadcastEstimate({
     required this.sitterCountInRadius,
+    required this.sitterCountInKecamatan,
+    this.kecamatan,
     required this.radiusKm,
   });
 
   final int sitterCountInRadius;
+  final int sitterCountInKecamatan;
+  final String? kecamatan;
   final double radiusKm;
+
+  int get sitterCount => sitterCountInKecamatan > 0 || kecamatan != null
+      ? sitterCountInKecamatan
+      : sitterCountInRadius;
 
   factory MarketplaceBroadcastEstimate.fromJson(Map<String, dynamic> json) {
     return MarketplaceBroadcastEstimate(
       sitterCountInRadius:
           (json['sitter_count_in_radius'] as num?)?.toInt() ?? 0,
+      sitterCountInKecamatan:
+          (json['sitter_count_in_kecamatan'] as num?)?.toInt() ?? 0,
+      kecamatan: DenpasarKecamatan.normalize('${json['kecamatan'] ?? ''}'),
       radiusKm: (json['radius_km'] as num?)?.toDouble() ?? 7,
     );
   }
@@ -114,6 +132,7 @@ class MarketplaceV2Service {
     required String dateLabel,
     required String timeRange,
     required Map<String, dynamic> location,
+    String? kecamatan,
     int price = 0,
     String notes = '',
   }) async {
@@ -126,6 +145,7 @@ class MarketplaceV2Service {
         'date_label': dateLabel,
         'time_range': timeRange,
         'location': location,
+        if (kecamatan != null) 'kecamatan': kecamatan,
         'price': price,
         if (notes.isNotEmpty) 'notes': notes,
       },
@@ -135,8 +155,9 @@ class MarketplaceV2Service {
 
   Future<MarketplaceBroadcastEstimate> estimateBroadcast({
     required String serviceType,
-    required double latitude,
-    required double longitude,
+    String? kecamatan,
+    double? latitude,
+    double? longitude,
     double radiusKm = broadcastRadiusKm,
   }) async {
     final response = await _api.getAuth(
@@ -144,9 +165,10 @@ class MarketplaceV2Service {
       action: 'estimate_broadcast',
       query: {
         'service_type': serviceType,
-        'latitude': '$latitude',
-        'longitude': '$longitude',
-        'radius_km': '$radiusKm',
+        if (kecamatan != null) 'kecamatan': kecamatan,
+        if (latitude != null) 'latitude': '$latitude',
+        if (longitude != null) 'longitude': '$longitude',
+        if (kecamatan == null) 'radius_km': '$radiusKm',
       },
     );
     return _api.parse(response, MarketplaceBroadcastEstimate.fromJson);
@@ -155,9 +177,6 @@ class MarketplaceV2Service {
   Future<List<BookingRequestV2>> listRequests({
     String pool = 'open',
     String? serviceType,
-    double? radiusKm,
-    double? latitude,
-    double? longitude,
   }) async {
     final response = await _api.getAuth(
       _script,
@@ -166,9 +185,6 @@ class MarketplaceV2Service {
         'pool': pool,
         if (serviceType != null && serviceType.isNotEmpty)
           'service_type': serviceType,
-        if (radiusKm != null) 'radius_km': '$radiusKm',
-        if (latitude != null) 'latitude': '$latitude',
-        if (longitude != null) 'longitude': '$longitude',
       },
     );
     return _api.parse(

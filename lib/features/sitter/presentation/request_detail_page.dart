@@ -122,7 +122,15 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
               icon: Icons.pets,
               label: l10n.requestDetailPets,
               value: request.petNames.isNotEmpty
-                  ? request.petNames.join(', ')
+                  ? request.petNames.asMap().entries.map((entry) {
+                      final species = entry.key < request.petSpecies.length
+                          ? request.petSpecies[entry.key]
+                          : '';
+                      return V2Formatters.petDisplayLabel(
+                        name: entry.value,
+                        species: species,
+                      );
+                    }).join(', ')
                   : l10n.requestPetCount(request.petIds.length),
             ),
             _DetailRow(

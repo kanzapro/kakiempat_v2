@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:kaki_empat/core/config/mvp_scope.dart';
-import 'package:kaki_empat/core/web/browser_geolocation.dart';
 import 'package:kaki_empat/core/formatters/v2_formatters.dart';
 import 'package:kaki_empat/core/models/v2_domain_models.dart';
 import 'package:kaki_empat/core/navigation/v2_page_route.dart';
@@ -34,6 +33,7 @@ import 'package:kaki_empat/features/sitter/presentation/earnings_report_page.dar
 import 'package:kaki_empat/features/sitter/presentation/promotions_page.dart';
 import 'package:kaki_empat/features/sitter/presentation/sitter_faq_page.dart';
 import 'package:kaki_empat/features/sitter/presentation/sitter_profile_page.dart';
+import 'package:kaki_empat/features/shared/widgets/v2_app_shell.dart';
 import 'package:kaki_empat/features/shared/widgets/v2_app_switcher.dart';
 import 'package:kaki_empat/core/web/domain_kind.dart';
 import 'package:kaki_empat/features/sitter/presentation/wallet_page.dart';
@@ -57,8 +57,6 @@ class _SitterHomePageState extends State<SitterHomePage> {
   List<BookingRequestV2> _requests = [];
   List<BookingV2> _bookings = [];
   String? _filterService;
-  double? _sitterLatitude;
-  double? _sitterLongitude;
   String _searchQuery = '';
   bool _loading = true;
   Object? _error;
@@ -102,24 +100,13 @@ class _SitterHomePageState extends State<SitterHomePage> {
   void _startPolling() {
     _pollTimer?.cancel();
     _pollTimer = Timer.periodic(
-      const Duration(seconds: 30),
+      const Duration(seconds: 15),
       (_) => _pollRequests(),
     );
   }
 
-  Future<void> _resolveSitterCoordinates(SitterProfileResult profile) async {
-    final browserCoords = await readBrowserGeolocation();
-    if (browserCoords != null) {
-      _sitterLatitude = browserCoords.latitude;
-      _sitterLongitude = browserCoords.longitude;
-      return;
-    }
-    _sitterLatitude = profile.profile?.latitude;
-    _sitterLongitude = profile.profile?.longitude;
-  }
-
   Future<void> _pollRequests() async {
-    if (_profile?.profile?.isApproved != true) return;
+    if (_profile?.profile?.isApproved != true || !_isAvailable) return;
     setState(() {
       _isPolling = true;
       _newRequestCount = 0;
@@ -127,9 +114,6 @@ class _SitterHomePageState extends State<SitterHomePage> {
     try {
       final requests = await MarketplaceV2Service.instance.listRequests(
         serviceType: _filterService,
-        radiusKm: MarketplaceV2Service.broadcastRadiusKm,
-        latitude: _sitterLatitude,
-        longitude: _sitterLongitude,
       );
       if (!mounted) return;
       final newCount = requests
@@ -169,7 +153,9 @@ class _SitterHomePageState extends State<SitterHomePage> {
           child: _isPolling
               ? Text(l10n.sitterPollingSearching, style: style)
               : Text(
-                  l10n.sitterRequestsInRadius(_requests.length),
+                  _profile?.profile?.kecamatan != null
+                      ? '${_requests.length} permintaan di ${_profile!.profile!.kecamatan}'
+                      : l10n.sitterRequestsInRadius(_requests.length),
                   style: style,
                 ),
         ),
@@ -203,25 +189,31 @@ class _SitterHomePageState extends State<SitterHomePage> {
       List<BookingRequestV2> requests = [];
       List<BookingV2> bookings = [];
 
-      if (profile.profile?.isApproved == true) {
-        await _resolveSitterCoordinates(profile);
+      final isApproved = profile.profile?.isApproved == true;
+      final isAvailable = profile.profile?.isAvailable ?? true;
+      if (isApproved) {
         final futures = <Future<Object?>>[
-          MarketplaceV2Service.instance.listRequests(
-            serviceType: _filterService,
-            radiusKm: MarketplaceV2Service.broadcastRadiusKm,
-            latitude: _sitterLatitude,
-            longitude: _sitterLongitude,
-          ),
           BookingV2Service.instance.listMyBookings(),
         ];
+        if (isAvailable) {
+          futures.insert(
+            0,
+            MarketplaceV2Service.instance.listRequests(
+              serviceType: _filterService,
+            ),
+          );
+        }
         if (!MvpScope.hideSitterWallet) {
           futures.add(SitterWalletService.instance.getWallet());
         }
         final both = await Future.wait(futures);
-        requests = both[0] as List<BookingRequestV2>;
-        bookings = both[1] as List<BookingV2>;
-        if (!MvpScope.hideSitterWallet && both.length > 2) {
-          final wallet = both[2] as SitterWalletSummary;
+        var idx = 0;
+        if (isAvailable) {
+          requests = both[idx++] as List<BookingRequestV2>;
+        }
+        bookings = both[idx++] as List<BookingV2>;
+        if (!MvpScope.hideSitterWallet && both.length > idx) {
+          final wallet = both[idx] as SitterWalletSummary;
           _monthlyEarnings = _computeMonthlyEarnings(wallet.entries);
         }
       }
@@ -243,7 +235,11 @@ class _SitterHomePageState extends State<SitterHomePage> {
         _newRequestCount = 0;
         _isPolling = false;
       });
-      if (profile.profile?.isApproved == true) _startPolling();
+      if (isApproved && isAvailable) {
+        _startPolling();
+      } else {
+        _pollTimer?.cancel();
+      }
     } on V2ApiException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -309,7 +305,16 @@ class _SitterHomePageState extends State<SitterHomePage> {
   }
 
   String _petLabel(BookingRequestV2 req) {
-    if (req.petNames.isNotEmpty) return req.petNames.join(', ');
+    if (req.petNames.isNotEmpty) {
+      final labels = <String>[];
+      for (var i = 0; i < req.petNames.length; i++) {
+        final species = i < req.petSpecies.length ? req.petSpecies[i] : '';
+        labels.add(
+          V2Formatters.petDisplayLabel(name: req.petNames[i], species: species),
+        );
+      }
+      return labels.join(', ');
+    }
     if (req.petIds.isNotEmpty) return 'Hewan #${req.petIds.first}';
     return req.ownerName.isNotEmpty ? req.ownerName : 'Hewan peliharaan';
   }
@@ -328,7 +333,12 @@ class _SitterHomePageState extends State<SitterHomePage> {
           _newRequestCount = 0;
         }
       });
-      if (value) await _load();
+      if (value) {
+        _startPolling();
+        await _load();
+      } else {
+        _pollTimer?.cancel();
+      }
     } on V2ApiException catch (e) {
       if (!mounted) return;
       setState(() => _togglingAvailability = false);
@@ -437,7 +447,8 @@ class _SitterHomePageState extends State<SitterHomePage> {
               Navigator.of(context).push(V2PageRoute(page: page));
             },
             itemBuilder: (ctx) => [
-              PopupMenuItem(value: 'earnings', child: Text(l10n.earningsReportTitle)),
+              if (!MvpScope.hideSitterWallet)
+                PopupMenuItem(value: 'earnings', child: Text(l10n.earningsReportTitle)),
               if (!MvpScope.hideSitterPromotions)
                 PopupMenuItem(value: 'promo', child: Text(l10n.promoTitle)),
               PopupMenuItem(value: 'faq', child: Text(l10n.helpFaqTitle)),
@@ -518,6 +529,7 @@ class _SitterHomePageState extends State<SitterHomePage> {
                             ],
                           ),
                           const SizedBox(height: 12),
+                          const V2GrowthHubSection(),
                           Card(
                             child: SwitchListTile(
                               title: Text(l10n.sitterAvailabilityTitle),
@@ -553,7 +565,11 @@ class _SitterHomePageState extends State<SitterHomePage> {
                                 ),
                               ),
                               Chip(
-                                label: Text(l10n.sitterBroadcastRadiusBadge),
+                                label: Text(
+                                  _profile?.profile?.kecamatan?.isNotEmpty == true
+                                      ? _profile!.profile!.kecamatan!
+                                      : l10n.sitterBroadcastRadiusBadge,
+                                ),
                                 visualDensity: VisualDensity.compact,
                               ),
                             ],

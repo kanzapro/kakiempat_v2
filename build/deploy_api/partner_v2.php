@@ -2,9 +2,10 @@
 declare(strict_types=1);
 
 /**
- * Partner / mini-service registry — super-app fase full.
+ * Partner ecosystem — mini-services & business merchant registry.
  *
- * GET ?action=list_services[&category=health|commerce|grooming]
+ * GET  ?action=list_services|list_businesses
+ * POST ?action=register_business|admin_approve_business
  */
 require_once __DIR__ . '/lib/kakiempat_partner_v2.php';
 
@@ -19,10 +20,28 @@ try {
             }
             kakiempat_partner_v2_list_services();
             break;
+        case 'list_businesses':
+            if ($method !== 'GET') {
+                v2ApiFail('method_not_allowed', 'Gunakan metode GET.', 405);
+            }
+            kakiempat_partner_v2_list_businesses();
+            break;
+        case 'register_business':
+            if ($method !== 'POST') {
+                v2ApiFail('method_not_allowed', 'Gunakan metode POST.', 405);
+            }
+            kakiempat_partner_v2_register_business(v2ApiBody());
+            break;
+        case 'admin_approve_business':
+            if ($method !== 'POST') {
+                v2ApiFail('method_not_allowed', 'Gunakan metode POST.', 405);
+            }
+            kakiempat_partner_v2_admin_approve_business(v2ApiBody());
+            break;
         default:
             v2ApiFail(
                 'action_required',
-                'Gunakan list_services.',
+                'Gunakan list_services, list_businesses, register_business, atau admin_approve_business.',
                 400,
             );
     }

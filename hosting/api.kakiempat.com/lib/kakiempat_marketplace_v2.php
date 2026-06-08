@@ -8,6 +8,7 @@ require_once __DIR__ . '/kakiempat_sitter_v2.php';
 require_once __DIR__ . '/kakiempat_platform_fee_v2.php';
 require_once __DIR__ . '/kakiempat_event_notifications.php';
 require_once __DIR__ . '/kakiempat_geo_v2.php';
+require_once __DIR__ . '/kakiempat_kecamatan_v2.php';
 
 /** @param array<string, mixed> $body */
 function kakiempat_marketplace_v2_create_request(array $body): void
@@ -35,6 +36,21 @@ function kakiempat_marketplace_v2_create_request(array $body): void
         v2ApiFail('invalid_location', 'Lokasi wajib diisi.', 400);
     }
 
+    $hasRequestKecamatan = kakiempat_kecamatan_v2_has_column($pdo, 'kakiempa_v2_requests');
+    $kecamatan = null;
+    if ($hasRequestKecamatan) {
+        $kecamatan = kakiempat_kecamatan_v2_normalize(
+            (string) ($body['kecamatan'] ?? $location['kecamatan'] ?? ''),
+        );
+        if ($kecamatan === null) {
+            $kecamatan = kakiempat_kecamatan_v2_get_owner($pdo, $auth['user_id']);
+        }
+        if ($kecamatan === null) {
+            kakiempat_kecamatan_v2_require(null);
+        }
+        $location['kecamatan'] = $kecamatan;
+    }
+
     $notes = trim((string) ($body['notes'] ?? ''));
     $totalPrice = (int) ($body['price'] ?? $body['total_price'] ?? 0);
     if ($totalPrice < 0) {
@@ -57,7 +73,28 @@ function kakiempat_marketplace_v2_create_request(array $body): void
     $hasGeoCols = kakiempat_geo_v2_has_indexed_coords($pdo, 'kakiempa_v2_requests');
 
     if ($hasDateLabel && $hasLocation) {
-        if ($hasGeoCols) {
+        if ($hasGeoCols && $hasRequestKecamatan) {
+            $pdo->prepare(
+                'INSERT INTO kakiempa_v2_requests
+                    (owner_user_id, status, service_code, date_label, time_range, location_json,
+                     kecamatan, latitude, longitude, notes, pet_ids, total_price, payment_amount)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            )->execute([
+                $auth['user_id'],
+                'open',
+                $serviceType,
+                $dateLabel,
+                $timeRange,
+                $locationJson,
+                $kecamatan,
+                $location['latitude'],
+                $location['longitude'],
+                $notes !== '' ? $notes : null,
+                $petIdsJson,
+                $totalPrice,
+                $paymentAmount,
+            ]);
+        } elseif ($hasGeoCols) {
             $pdo->prepare(
                 'INSERT INTO kakiempa_v2_requests
                     (owner_user_id, status, service_code, date_label, time_range, location_json,
@@ -72,6 +109,25 @@ function kakiempat_marketplace_v2_create_request(array $body): void
                 $locationJson,
                 $location['latitude'],
                 $location['longitude'],
+                $notes !== '' ? $notes : null,
+                $petIdsJson,
+                $totalPrice,
+                $paymentAmount,
+            ]);
+        } elseif ($hasRequestKecamatan) {
+            $pdo->prepare(
+                'INSERT INTO kakiempa_v2_requests
+                    (owner_user_id, status, service_code, date_label, time_range, location_json,
+                     kecamatan, notes, pet_ids, total_price, payment_amount)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            )->execute([
+                $auth['user_id'],
+                'open',
+                $serviceType,
+                $dateLabel,
+                $timeRange,
+                $locationJson,
+                $kecamatan,
                 $notes !== '' ? $notes : null,
                 $petIdsJson,
                 $totalPrice,
@@ -118,15 +174,24 @@ function kakiempat_marketplace_v2_create_request(array $body): void
         'request_id' => (string) $requestId,
         'status' => 'open',
         'message' => 'Permintaan marketplace berhasil dibuat.',
-        'radius_km' => kakiempat_marketplace_v2_broadcast_radius_km(),
     ];
-    if ($location['latitude'] !== null && $location['longitude'] !== null) {
-        $response['sitter_count_in_radius'] = kakiempat_marketplace_v2_count_sitters_in_radius(
+    if ($hasRequestKecamatan && $kecamatan !== null) {
+        $response['kecamatan'] = $kecamatan;
+        $response['sitter_count_in_kecamatan'] = kakiempat_kecamatan_v2_count_sitters(
             $pdo,
-            (float) $location['latitude'],
-            (float) $location['longitude'],
+            $kecamatan,
             $serviceType,
         );
+    } else {
+        $response['radius_km'] = kakiempat_marketplace_v2_broadcast_radius_km();
+        if ($location['latitude'] !== null && $location['longitude'] !== null) {
+            $response['sitter_count_in_radius'] = kakiempat_marketplace_v2_count_sitters_in_radius(
+                $pdo,
+                (float) $location['latitude'],
+                (float) $location['longitude'],
+                $serviceType,
+            );
+        }
     }
 
     v2ApiRespondData($response, 201);
@@ -149,6 +214,7 @@ function kakiempat_marketplace_v2_list_requests(): void
         v2ApiRespondData([
             'requests' => [],
             'total' => 0,
+            'kecamatan' => kakiempat_kecamatan_v2_get_sitter($pdo, $auth['user_id']),
             'radius_km' => kakiempat_marketplace_v2_broadcast_radius_km(),
         ]);
         return;
@@ -158,6 +224,7 @@ function kakiempat_marketplace_v2_list_requests(): void
         v2ApiRespondData([
             'requests' => [],
             'total' => 0,
+            'kecamatan' => kakiempat_kecamatan_v2_get_sitter($pdo, $auth['user_id']),
             'radius_km' => kakiempat_marketplace_v2_broadcast_radius_km(),
             'availability_off' => true,
         ]);
@@ -169,6 +236,7 @@ function kakiempat_marketplace_v2_list_requests(): void
             v2ApiRespondData([
                 'requests' => [],
                 'total' => 0,
+                'kecamatan' => kakiempat_kecamatan_v2_get_sitter($pdo, $auth['user_id']),
                 'radius_km' => kakiempat_marketplace_v2_broadcast_radius_km(),
             ]);
             return;
@@ -176,8 +244,12 @@ function kakiempat_marketplace_v2_list_requests(): void
         $serviceCodes = [$serviceType];
     }
 
-    $sitterCoords = kakiempat_marketplace_v2_resolve_sitter_coordinates($pdo, $auth['user_id']);
-    $useSpatial = $sitterCoords !== null;
+    $sitterKecamatan = kakiempat_kecamatan_v2_get_sitter($pdo, $auth['user_id']);
+    $useKecamatan = $sitterKecamatan !== null
+        && kakiempat_kecamatan_v2_has_column($pdo, 'kakiempa_v2_requests');
+
+    $sitterCoords = $useKecamatan ? null : kakiempat_marketplace_v2_resolve_sitter_coordinates($pdo, $auth['user_id']);
+    $useSpatial = !$useKecamatan && $sitterCoords !== null;
     if ($useSpatial && ($radius === null || $radius <= 0)) {
         $radius = kakiempat_marketplace_v2_broadcast_radius_km();
     }
@@ -193,6 +265,9 @@ function kakiempat_marketplace_v2_list_requests(): void
     if (v2ApiColumnExists($pdo, 'kakiempa_v2_requests', 'location_json')) {
         $extraCols .= ', r.location_json';
     }
+    if (kakiempat_kecamatan_v2_has_column($pdo, 'kakiempa_v2_requests')) {
+        $extraCols .= ', r.kecamatan';
+    }
 
     $reqCoords = kakiempat_geo_v2_resolve_coord_sql(
         $pdo,
@@ -203,7 +278,17 @@ function kakiempat_marketplace_v2_list_requests(): void
     $reqLatSql = $reqCoords['lat_sql'];
     $reqLngSql = $reqCoords['lng_sql'];
 
-    if ($useSpatial && $radius !== null && $radius > 0) {
+    if ($useKecamatan) {
+        $sql = "SELECT r.id, r.owner_user_id, r.service_code, r.scheduled_at, r.notes,
+                       r.pet_ids, r.total_price, r.payment_amount, r.status, r.created_at,
+                       u.name AS owner_name{$extraCols}
+                FROM kakiempa_v2_requests r
+                INNER JOIN kakiempa_v2_users u ON u.id = r.owner_user_id
+                WHERE r.status = ? AND r.service_code IN ({$placeholders})
+                  AND r.kecamatan = ?
+                ORDER BY r.created_at DESC";
+        $params[] = $sitterKecamatan;
+    } elseif ($useSpatial && $radius !== null && $radius > 0) {
         $bbox = kakiempat_geo_v2_bounding_box(
             $sitterCoords['latitude'],
             $sitterCoords['longitude'],
@@ -269,6 +354,8 @@ function kakiempat_marketplace_v2_list_requests(): void
     v2ApiRespondData([
         'requests' => $requests,
         'total' => count($requests),
+        'kecamatan' => $useKecamatan ? $sitterKecamatan : null,
+        'kecamatan_filter' => $useKecamatan,
         'radius_km' => $useSpatial ? $radius : null,
         'spatial_filter' => $useSpatial,
     ]);
@@ -285,9 +372,29 @@ function kakiempat_marketplace_v2_estimate_broadcast(): void
         v2ApiFail('invalid_service', 'Jenis layanan tidak valid.', 400);
     }
 
+    $kecamatanInput = trim((string) ($_GET['kecamatan'] ?? ''));
+    if ($kecamatanInput !== ''
+        && kakiempat_kecamatan_v2_has_column($pdo, 'kakiempa_v2_sitter_profiles')) {
+        $kecamatan = kakiempat_kecamatan_v2_require($kecamatanInput);
+        v2ApiRespondData([
+            'sitter_count_in_kecamatan' => kakiempat_kecamatan_v2_count_sitters(
+                $pdo,
+                $kecamatan,
+                $serviceType,
+            ),
+            'kecamatan' => $kecamatan,
+        ]);
+
+        return;
+    }
+
     $coords = kakiempat_marketplace_v2_parse_query_coordinates();
     if ($coords === null) {
-        v2ApiFail('coordinates_required', 'Latitude dan longitude wajib untuk estimasi broadcast.', 400);
+        v2ApiFail(
+            'kecamatan_required',
+            'Kecamatan wajib untuk estimasi pengasuh di area Denpasar.',
+            400,
+        );
     }
 
     $radiusKm = $_GET['radius_km'] ?? null;
@@ -446,7 +553,7 @@ function kakiempat_marketplace_v2_accept_offer(array $body): void
         $pdo->prepare("UPDATE kakiempa_v2_requests SET status = 'matched' WHERE id = ?")
             ->execute([(int) $offer['request_id']]);
 
-        $bookingStatus = $paymentAmount > 0 ? 'awaitingPayment' : 'pending';
+        $bookingStatus = $paymentAmount > 0 ? 'awaiting_payment' : 'pending';
         $pdo->prepare(
             'INSERT INTO kakiempa_v2_bookings
                 (offer_id, request_id, owner_user_id, sitter_user_id, status,
@@ -639,28 +746,32 @@ function kakiempat_marketplace_v2_parse_location(array $body): array
     if ($topAddress !== '') {
         $lat = $body['latitude'] ?? $body['lat'] ?? null;
         $lng = $body['longitude'] ?? $body['lng'] ?? $body['lon'] ?? null;
+        $kecamatan = kakiempat_kecamatan_v2_normalize((string) ($body['kecamatan'] ?? ''));
         return [
             'address' => $topAddress,
             'latitude' => is_numeric($lat) ? (float) $lat : null,
             'longitude' => is_numeric($lng) ? (float) $lng : null,
+            'kecamatan' => $kecamatan,
         ];
     }
 
     $loc = $body['location'] ?? null;
     if (is_string($loc)) {
-        return ['address' => trim($loc), 'latitude' => null, 'longitude' => null];
+        return ['address' => trim($loc), 'latitude' => null, 'longitude' => null, 'kecamatan' => null];
     }
     if (!is_array($loc)) {
-        return ['address' => '', 'latitude' => null, 'longitude' => null];
+        return ['address' => '', 'latitude' => null, 'longitude' => null, 'kecamatan' => null];
     }
 
     $lat = $loc['latitude'] ?? $loc['lat'] ?? null;
     $lng = $loc['longitude'] ?? $loc['lng'] ?? $loc['lon'] ?? null;
+    $kecamatan = kakiempat_kecamatan_v2_normalize((string) ($loc['kecamatan'] ?? ''));
 
     return [
         'address' => trim((string) ($loc['address'] ?? '')),
         'latitude' => is_numeric($lat) ? (float) $lat : null,
         'longitude' => is_numeric($lng) ? (float) $lng : null,
+        'kecamatan' => $kecamatan,
     ];
 }
 
@@ -883,6 +994,9 @@ function kakiempat_marketplace_v2_format_request(array $row): array
         $decoded = json_decode((string) $row['location_json'], true);
         $formatted['location'] = is_array($decoded) ? $decoded : null;
     }
+    if (isset($row['kecamatan']) && $row['kecamatan'] !== null && $row['kecamatan'] !== '') {
+        $formatted['kecamatan'] = (string) $row['kecamatan'];
+    }
     if (isset($row['distance_km'])) {
         $formatted['distance_km'] = (float) $row['distance_km'];
     }
@@ -896,34 +1010,5 @@ function kakiempat_marketplace_v2_format_request(array $row): array
  */
 function kakiempat_marketplace_v2_enrich_request_pets(PDO $pdo, array $formatted): array
 {
-    $petIds = $formatted['pet_ids'] ?? [];
-    if (!is_array($petIds) || $petIds === []) {
-        $formatted['pet_names'] = [];
-
-        return $formatted;
-    }
-
-    $placeholders = implode(',', array_fill(0, count($petIds), '?'));
-    $stmt = $pdo->prepare(
-        "SELECT id, name FROM kakiempa_v2_pets WHERE id IN ({$placeholders})",
-    );
-    $stmt->execute(array_values($petIds));
-    $namesById = [];
-    while ($petRow = $stmt->fetch(PDO::FETCH_ASSOC)) {
-        if (!is_array($petRow)) {
-            continue;
-        }
-        $namesById[(string) ($petRow['id'] ?? '')] = (string) ($petRow['name'] ?? '');
-    }
-
-    $petNames = [];
-    foreach ($petIds as $petId) {
-        $key = (string) $petId;
-        if ($key !== '' && isset($namesById[$key]) && $namesById[$key] !== '') {
-            $petNames[] = $namesById[$key];
-        }
-    }
-    $formatted['pet_names'] = $petNames;
-
-    return $formatted;
+    return kakiempat_booking_v2_enrich_pets($pdo, $formatted);
 }

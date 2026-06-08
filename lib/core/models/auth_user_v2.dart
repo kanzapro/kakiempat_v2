@@ -24,6 +24,8 @@ class AuthUserV2 {
       role == 'owner' || effectiveRoles.contains('owner');
   bool get isSitter =>
       role == 'sitter' || effectiveRoles.contains('sitter');
+  bool get isPartner =>
+      effectiveRoles.contains('partner');
 
   factory AuthUserV2.fromJson(Map<String, dynamic> json) {
     final rawRoles = json['roles'];

@@ -4,6 +4,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../v2_api_common.php';
 require_once __DIR__ . '/kakiempat_service_v2.php';
 require_once __DIR__ . '/kakiempat_sitter_badges_v2.php';
+require_once __DIR__ . '/kakiempat_kecamatan_v2.php';
 
 /** @return array<string, mixed> */
 function kakiempat_sitter_v2_decode_json(?string $raw): array
@@ -47,6 +48,14 @@ function kakiempat_sitter_v2_save_profile(array $body): void
     }
 
     $pdo = v2ApiPdo();
+    $hasKecamatan = kakiempat_kecamatan_v2_has_column($pdo, 'kakiempa_v2_sitter_profiles');
+    $kecamatan = null;
+    if ($hasKecamatan) {
+        $kecamatan = kakiempat_kecamatan_v2_require(
+            (string) ($body['kecamatan'] ?? ''),
+        );
+    }
+
     if ($serviceCodes !== []) {
         kakiempat_service_v2_assert_valid_codes($pdo, $serviceCodes);
     }
@@ -71,6 +80,7 @@ function kakiempat_sitter_v2_save_profile(array $body): void
         'latitude' => $latitude,
         'longitude' => $longitude,
         'bio' => $bio,
+        'kecamatan' => $kecamatan,
         'is_available' => array_key_exists('is_available', $existingMeta)
             ? ($existingMeta['is_available'] !== false)
             : true,
@@ -87,7 +97,24 @@ function kakiempat_sitter_v2_save_profile(array $body): void
     );
     $stmt->execute([$auth['user_id']]);
     if ($stmt->fetchColumn()) {
-        if ($hasGeoCols) {
+        if ($hasGeoCols && $hasKecamatan) {
+            $pdo->prepare(
+                'UPDATE kakiempa_v2_sitter_profiles
+                 SET address = ?, kecamatan = ?, profile_json = ?, latitude = ?, longitude = ?,
+                     display_name = ?, legal_name = ?, whatsapp = ?
+                 WHERE user_id = ?',
+            )->execute([
+                $address,
+                $kecamatan,
+                $jsonProfile,
+                $latitude,
+                $longitude,
+                $name,
+                $name,
+                $phone,
+                $auth['user_id'],
+            ]);
+        } elseif ($hasGeoCols) {
             $pdo->prepare(
                 'UPDATE kakiempa_v2_sitter_profiles
                  SET address = ?, profile_json = ?, latitude = ?, longitude = ?,
@@ -103,6 +130,21 @@ function kakiempat_sitter_v2_save_profile(array $body): void
                 $phone,
                 $auth['user_id'],
             ]);
+        } elseif ($hasKecamatan) {
+            $pdo->prepare(
+                'UPDATE kakiempa_v2_sitter_profiles
+                 SET address = ?, kecamatan = ?, profile_json = ?,
+                     display_name = ?, legal_name = ?, whatsapp = ?
+                 WHERE user_id = ?',
+            )->execute([
+                $address,
+                $kecamatan,
+                $jsonProfile,
+                $name,
+                $name,
+                $phone,
+                $auth['user_id'],
+            ]);
         } else {
             $pdo->prepare(
                 'UPDATE kakiempa_v2_sitter_profiles
@@ -112,7 +154,25 @@ function kakiempat_sitter_v2_save_profile(array $body): void
             )->execute([$address, $jsonProfile, $name, $name, $phone, $auth['user_id']]);
         }
     } else {
-        if ($hasGeoCols) {
+        if ($hasGeoCols && $hasKecamatan) {
+            $pdo->prepare(
+                'INSERT INTO kakiempa_v2_sitter_profiles
+                    (user_id, display_name, legal_name, whatsapp, address, kecamatan, status,
+                     profile_json, latitude, longitude)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            )->execute([
+                $auth['user_id'],
+                $name,
+                $name,
+                $phone,
+                $address,
+                $kecamatan,
+                'draft',
+                $jsonProfile,
+                $latitude,
+                $longitude,
+            ]);
+        } elseif ($hasGeoCols) {
             $pdo->prepare(
                 'INSERT INTO kakiempa_v2_sitter_profiles
                     (user_id, display_name, legal_name, whatsapp, address, status,
@@ -128,6 +188,21 @@ function kakiempat_sitter_v2_save_profile(array $body): void
                 $jsonProfile,
                 $latitude,
                 $longitude,
+            ]);
+        } elseif ($hasKecamatan) {
+            $pdo->prepare(
+                'INSERT INTO kakiempa_v2_sitter_profiles
+                    (user_id, display_name, legal_name, whatsapp, address, kecamatan, status, profile_json)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            )->execute([
+                $auth['user_id'],
+                $name,
+                $name,
+                $phone,
+                $address,
+                $kecamatan,
+                'draft',
+                $jsonProfile,
             ]);
         } else {
             $pdo->prepare(
@@ -294,9 +369,11 @@ function kakiempat_sitter_v2_get_profile(): void
 /** @return array<string, mixed>|null */
 function kakiempat_sitter_v2_load_profile_row(PDO $pdo, int $userId): ?array
 {
+    $hasKecamatan = kakiempat_kecamatan_v2_has_column($pdo, 'kakiempa_v2_sitter_profiles');
+    $kecamatanCol = $hasKecamatan ? ', kecamatan' : '';
     $stmt = $pdo->prepare(
-        'SELECT address, profile_json, status, submitted_at
-         FROM kakiempa_v2_sitter_profiles WHERE user_id = ? LIMIT 1',
+        "SELECT address, profile_json, status, submitted_at{$kecamatanCol}
+         FROM kakiempa_v2_sitter_profiles WHERE user_id = ? LIMIT 1",
     );
     $stmt->execute([$userId]);
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -314,7 +391,11 @@ function kakiempat_sitter_v2_load_profile_row(PDO $pdo, int $userId): ?array
     $status = (string) ($row['status'] ?? 'draft');
     $bio = trim((string) ($meta['bio'] ?? ''));
     $address = trim((string) ($row['address'] ?? ''));
-    $profileComplete = $address !== '' && $bio !== '' && count($services) > 0;
+    $kecamatan = $hasKecamatan
+        ? kakiempat_kecamatan_v2_normalize((string) ($row['kecamatan'] ?? ''))
+        : kakiempat_kecamatan_v2_normalize((string) ($meta['kecamatan'] ?? ''));
+    $profileComplete = $address !== '' && $bio !== '' && count($services) > 0
+        && (!$hasKecamatan || $kecamatan !== null);
 
     $verification = $meta['verification'] ?? [];
     $hasKtp = is_array($verification) && !empty($verification['ktp_data']);
@@ -325,6 +406,7 @@ function kakiempat_sitter_v2_load_profile_row(PDO $pdo, int $userId): ?array
         'profile' => [
             'bio' => $bio,
             'address' => $address,
+            'kecamatan' => $kecamatan,
             'latitude' => $meta['latitude'] ?? null,
             'longitude' => $meta['longitude'] ?? null,
             'status' => $status,

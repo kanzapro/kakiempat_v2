@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../v2_api_common.php';
+require_once __DIR__ . '/kakiempat_kecamatan_v2.php';
 
 /** @param array<string, mixed> $body */
 function kakiempat_owner_v2_save_profile(array $body): void
@@ -20,6 +21,14 @@ function kakiempat_owner_v2_save_profile(array $body): void
     }
 
     $pdo = v2ApiPdo();
+    $hasKecamatan = kakiempat_kecamatan_v2_has_column($pdo, 'kakiempa_v2_owner_profiles');
+    $kecamatan = null;
+    if ($hasKecamatan) {
+        $kecamatan = kakiempat_kecamatan_v2_require(
+            (string) ($body['kecamatan'] ?? ''),
+        );
+    }
+
     $user = v2ApiFetchUser($pdo, $auth['user_id']);
     if ($user === null) {
         v2ApiFail('user_not_found', 'Akun tidak ditemukan.', 404);
@@ -33,18 +42,35 @@ function kakiempat_owner_v2_save_profile(array $body): void
     );
     $stmt->execute([$auth['user_id']]);
     if ($stmt->fetchColumn()) {
-        $pdo->prepare(
-            'UPDATE kakiempa_v2_owner_profiles
-             SET home_address = ?, latitude = ?, longitude = ?,
-                 display_name = ?, whatsapp = ?
-             WHERE user_id = ?',
-        )->execute([$address, $latitude, $longitude, $name, $phone, $auth['user_id']]);
+        if ($hasKecamatan) {
+            $pdo->prepare(
+                'UPDATE kakiempa_v2_owner_profiles
+                 SET home_address = ?, kecamatan = ?, latitude = ?, longitude = ?,
+                     display_name = ?, whatsapp = ?
+                 WHERE user_id = ?',
+            )->execute([$address, $kecamatan, $latitude, $longitude, $name, $phone, $auth['user_id']]);
+        } else {
+            $pdo->prepare(
+                'UPDATE kakiempa_v2_owner_profiles
+                 SET home_address = ?, latitude = ?, longitude = ?,
+                     display_name = ?, whatsapp = ?
+                 WHERE user_id = ?',
+            )->execute([$address, $latitude, $longitude, $name, $phone, $auth['user_id']]);
+        }
     } else {
-        $pdo->prepare(
-            'INSERT INTO kakiempa_v2_owner_profiles
-                (user_id, display_name, whatsapp, home_address, latitude, longitude)
-             VALUES (?, ?, ?, ?, ?, ?)',
-        )->execute([$auth['user_id'], $name, $phone, $address, $latitude, $longitude]);
+        if ($hasKecamatan) {
+            $pdo->prepare(
+                'INSERT INTO kakiempa_v2_owner_profiles
+                    (user_id, display_name, whatsapp, home_address, kecamatan, latitude, longitude)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)',
+            )->execute([$auth['user_id'], $name, $phone, $address, $kecamatan, $latitude, $longitude]);
+        } else {
+            $pdo->prepare(
+                'INSERT INTO kakiempa_v2_owner_profiles
+                    (user_id, display_name, whatsapp, home_address, latitude, longitude)
+                 VALUES (?, ?, ?, ?, ?, ?)',
+            )->execute([$auth['user_id'], $name, $phone, $address, $latitude, $longitude]);
+        }
     }
 
     kakiempat_owner_v2_get_profile();
@@ -201,9 +227,11 @@ function kakiempat_owner_v2_get_profile(): void
 /** @return array<string, mixed> */
 function kakiempat_owner_v2_build_profile_payload(PDO $pdo, int $userId): array
 {
+    $hasKecamatan = kakiempat_kecamatan_v2_has_column($pdo, 'kakiempa_v2_owner_profiles');
+    $kecamatanCol = $hasKecamatan ? ', kecamatan' : '';
     $stmt = $pdo->prepare(
-        'SELECT home_address, latitude, longitude, display_name, whatsapp
-         FROM kakiempa_v2_owner_profiles WHERE user_id = ? LIMIT 1',
+        "SELECT home_address, latitude, longitude, display_name, whatsapp{$kecamatanCol}
+         FROM kakiempa_v2_owner_profiles WHERE user_id = ? LIMIT 1",
     );
     $stmt->execute([$userId]);
     $profileRow = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -221,11 +249,16 @@ function kakiempat_owner_v2_build_profile_payload(PDO $pdo, int $userId): array
     }
 
     $address = trim((string) ($profileRow['home_address'] ?? ''));
-    $onboardingComplete = $address !== '' && count($pets) > 0;
+    $kecamatan = $hasKecamatan && is_array($profileRow)
+        ? kakiempat_kecamatan_v2_normalize((string) ($profileRow['kecamatan'] ?? ''))
+        : null;
+    $onboardingComplete = $address !== '' && count($pets) > 0
+        && (!$hasKecamatan || $kecamatan !== null);
 
     return [
         'profile' => $profileRow ? [
             'address' => $address,
+            'kecamatan' => $kecamatan,
             'latitude' => $profileRow['latitude'] ?? null,
             'longitude' => $profileRow['longitude'] ?? null,
             'full_name' => (string) ($profileRow['display_name'] ?? ''),
@@ -279,6 +312,45 @@ function kakiempat_owner_v2_get_dashboard(): void
 function kakiempat_owner_v2_build_recommendations(PDO $pdo, int $userId, array $bookings): array
 {
     $items = [];
+    $maxItems = 5;
+    $seenKinds = [];
+
+    $push = static function (array $item) use (&$items, &$seenKinds, $maxItems): void {
+        if (count($items) >= $maxItems) {
+            return;
+        }
+        $kind = (string) ($item['kind'] ?? '');
+        if ($kind !== '' && isset($seenKinds[$kind])) {
+            return;
+        }
+        if ($kind !== '') {
+            $seenKinds[$kind] = true;
+        }
+        $items[] = $item;
+    };
+
+    foreach ($bookings as $booking) {
+        if (!is_array($booking)) {
+            continue;
+        }
+        $status = strtolower(str_replace('_', '', (string) ($booking['status'] ?? '')));
+        if ($status !== 'awaitingpayment') {
+            continue;
+        }
+        $bookingId = (string) ($booking['id'] ?? '');
+        if ($bookingId === '') {
+            continue;
+        }
+        $label = trim((string) ($booking['service_label'] ?? $booking['service_code'] ?? 'Booking'));
+        $push([
+            'kind' => 'pending_payment',
+            'title' => 'Selesaikan pembayaran booking',
+            'subtitle' => $label !== '' ? $label : 'Upload bukti transfer SeaBank',
+            'action' => 'open_payment',
+            'payload' => ['booking_id' => $bookingId],
+        ]);
+        break;
+    }
 
     $completed = array_values(array_filter(
         $bookings,
@@ -292,14 +364,38 @@ function kakiempat_owner_v2_build_recommendations(PDO $pdo, int $userId, array $
         $sitterId = (string) ($last['sitter_user_id'] ?? '');
         $sitterName = (string) ($last['sitter_name'] ?? '');
         if ($sitterId !== '') {
-            $items[] = [
+            $push([
                 'kind' => 'rebook_sitter',
                 'title' => 'Pesan ulang pengasuh terakhir',
                 'subtitle' => $sitterName !== '' ? $sitterName : 'Pengasuh favorit Anda',
-                'action' => 'open_catalog',
-                'payload' => ['sitter_user_id' => $sitterId],
-            ];
+                'action' => 'open_sitter',
+                'payload' => [
+                    'sitter_user_id' => $sitterId,
+                    'sitter_name' => $sitterName,
+                ],
+            ]);
         }
+    }
+
+    $personalStmt = $pdo->prepare(
+        "SELECT service_code, COUNT(*) AS cnt
+         FROM kakiempa_v2_bookings
+         WHERE owner_user_id = ?
+           AND LOWER(status) = 'completed'
+         GROUP BY service_code
+         ORDER BY cnt DESC
+         LIMIT 1",
+    );
+    $personalStmt->execute([$userId]);
+    $personal = $personalStmt->fetch(PDO::FETCH_ASSOC);
+    if (is_array($personal) && !empty($personal['service_code'])) {
+        $push([
+            'kind' => 'personal_service',
+            'title' => 'Layanan yang sering Anda pesan',
+            'subtitle' => (string) $personal['service_code'],
+            'action' => 'open_service',
+            'payload' => ['service_code' => (string) $personal['service_code']],
+        ]);
     }
 
     $stmt = $pdo->query(
@@ -312,13 +408,64 @@ function kakiempat_owner_v2_build_recommendations(PDO $pdo, int $userId, array $
     );
     $popular = $stmt ? $stmt->fetch(PDO::FETCH_ASSOC) : false;
     if (is_array($popular) && !empty($popular['service_code'])) {
-        $items[] = [
-            'kind' => 'popular_service',
-            'title' => 'Layanan populer di Kaki Empat',
-            'subtitle' => (string) $popular['service_code'],
-            'action' => 'open_service',
-            'payload' => ['service_code' => (string) $popular['service_code']],
-        ];
+        $popularCode = (string) $popular['service_code'];
+        $alreadyPersonal = is_array($personal)
+            && (string) ($personal['service_code'] ?? '') === $popularCode;
+        if (!$alreadyPersonal) {
+            $push([
+                'kind' => 'popular_service',
+                'title' => 'Layanan populer di Kaki Empat',
+                'subtitle' => $popularCode,
+                'action' => 'open_service',
+                'payload' => ['service_code' => $popularCode],
+            ]);
+        }
+    }
+
+    if (v2ApiTableExists($pdo, 'kakiempa_v2_requests')
+        && v2ApiTableExists($pdo, 'kakiempa_v2_offers')) {
+        $offerStmt = $pdo->prepare(
+            "SELECT r.id, r.service_code,
+                    (SELECT COUNT(*) FROM kakiempa_v2_offers o WHERE o.request_id = r.id) AS offer_count
+             FROM kakiempa_v2_requests r
+             WHERE r.owner_user_id = ?
+               AND LOWER(r.status) IN ('open', 'matched')
+             HAVING offer_count > 0
+             ORDER BY r.created_at DESC
+             LIMIT 1",
+        );
+        $offerStmt->execute([$userId]);
+        $openRequest = $offerStmt->fetch(PDO::FETCH_ASSOC);
+        if (is_array($openRequest) && !empty($openRequest['id'])) {
+            $offerCount = (int) ($openRequest['offer_count'] ?? 0);
+            $push([
+                'kind' => 'review_offers',
+                'title' => 'Penawaran pengasuh menunggu',
+                'subtitle' => $offerCount . ' penawaran untuk request Anda',
+                'action' => 'open_request_offers',
+                'payload' => ['request_id' => (string) $openRequest['id']],
+            ]);
+        }
+    }
+
+    if (v2ApiTableExists($pdo, 'kakiempa_v2_partner_services')) {
+        $partnerStmt = $pdo->query(
+            "SELECT code, name, category
+             FROM kakiempa_v2_partner_services
+             WHERE is_active = 1
+             ORDER BY sort_order ASC, id ASC
+             LIMIT 1",
+        );
+        $partner = $partnerStmt ? $partnerStmt->fetch(PDO::FETCH_ASSOC) : false;
+        if (is_array($partner) && !empty($partner['name'])) {
+            $push([
+                'kind' => 'partner_discover',
+                'title' => 'Jelajahi layanan partner',
+                'subtitle' => (string) $partner['name'],
+                'action' => 'open_discover',
+                'payload' => ['partner_code' => (string) ($partner['code'] ?? '')],
+            ]);
+        }
     }
 
     $petStmt = $pdo->prepare(
@@ -327,16 +474,176 @@ function kakiempat_owner_v2_build_recommendations(PDO $pdo, int $userId, array $
     $petStmt->execute([$userId]);
     $species = (string) ($petStmt->fetchColumn() ?: '');
     if ($species !== '') {
-        $items[] = [
+        $push([
             'kind' => 'pet_care_tip',
             'title' => 'Perawatan untuk hewan Anda',
             'subtitle' => 'Tips dan layanan untuk ' . $species,
             'action' => 'open_tips',
             'payload' => ['species' => $species],
-        ];
+        ]);
+    }
+
+    if (v2ApiTableExists($pdo, 'kakiempa_v2_pet_gallery')) {
+        $galleryStmt = $pdo->prepare(
+            'SELECT COUNT(*) FROM kakiempa_v2_pet_gallery WHERE owner_user_id = ?',
+        );
+        $galleryStmt->execute([$userId]);
+        $galleryCount = (int) $galleryStmt->fetchColumn();
+        if ($galleryCount === 0) {
+            $push([
+                'kind' => 'community_gallery',
+                'title' => 'Bagikan foto hewan peliharaan',
+                'subtitle' => 'Gabung galeri komunitas Kaki Empat',
+                'action' => 'open_community',
+                'payload' => [],
+            ]);
+        }
     }
 
     return $items;
+}
+
+function kakiempat_owner_v2_get_pet_timeline(): void
+{
+    $auth = v2ApiRequireAuth();
+    v2ApiRequireRole($auth, ['owner', 'founder']);
+    $pdo = v2ApiPdo();
+    $userId = $auth['user_id'];
+
+    $petId = (int) ($_GET['pet_id'] ?? 0);
+    if ($petId < 1) {
+        v2ApiFail('invalid_pet_id', 'pet_id wajib.', 400);
+    }
+
+    $petStmt = $pdo->prepare(
+        'SELECT id, name, species, breed, age_label, weight_kg, behavior_notes, created_at
+         FROM kakiempa_v2_pets WHERE id = ? AND owner_user_id = ? LIMIT 1',
+    );
+    $petStmt->execute([$petId, $userId]);
+    $petRow = $petStmt->fetch(PDO::FETCH_ASSOC);
+    if (!is_array($petRow)) {
+        v2ApiFail('pet_not_found', 'Hewan tidak ditemukan.', 404);
+    }
+
+    $events = [];
+    $petIdStr = (string) $petId;
+
+    $push = static function (array $event) use (&$events): void {
+        $events[] = $event;
+    };
+
+    $push([
+        'kind' => 'pet_registered',
+        'title' => 'Profil hewan dibuat',
+        'subtitle' => (string) ($petRow['name'] ?? ''),
+        'occurred_at' => (string) ($petRow['created_at'] ?? ''),
+    ]);
+
+    if (trim((string) ($petRow['behavior_notes'] ?? '')) !== '') {
+        $push([
+            'kind' => 'health_note',
+            'title' => 'Catatan perilaku',
+            'subtitle' => (string) $petRow['behavior_notes'],
+            'occurred_at' => (string) ($petRow['created_at'] ?? ''),
+        ]);
+    }
+
+    if (v2ApiTableExists($pdo, 'kakiempa_v2_requests')) {
+        $reqStmt = $pdo->prepare(
+            'SELECT r.id, r.service_code, r.status, r.date_label, r.created_at, r.pet_ids
+             FROM kakiempa_v2_requests r
+             WHERE r.owner_user_id = ?
+             ORDER BY r.created_at DESC
+             LIMIT 50',
+        );
+        $reqStmt->execute([$userId]);
+        while ($row = $reqStmt->fetch(PDO::FETCH_ASSOC)) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $petIds = json_decode((string) ($row['pet_ids'] ?? '[]'), true);
+            if (!is_array($petIds) || !in_array($petIdStr, array_map('strval', $petIds), true)) {
+                continue;
+            }
+            $push([
+                'kind' => 'request',
+                'title' => 'Permintaan layanan',
+                'subtitle' => (string) ($row['service_code'] ?? ''),
+                'status' => (string) ($row['status'] ?? ''),
+                'occurred_at' => (string) ($row['created_at'] ?? ''),
+                'payload' => ['request_id' => (string) ($row['id'] ?? '')],
+            ]);
+        }
+    }
+
+    if (v2ApiTableExists($pdo, 'kakiempa_v2_bookings')) {
+        $bookStmt = $pdo->prepare(
+            'SELECT b.id, b.status, b.service_code, b.created_at, b.updated_at, r.pet_ids
+             FROM kakiempa_v2_bookings b
+             LEFT JOIN kakiempa_v2_requests r ON r.id = b.request_id
+             WHERE b.owner_user_id = ?
+             ORDER BY b.created_at DESC
+             LIMIT 50',
+        );
+        $bookStmt->execute([$userId]);
+        while ($row = $bookStmt->fetch(PDO::FETCH_ASSOC)) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $petIds = json_decode((string) ($row['pet_ids'] ?? '[]'), true);
+            if (!is_array($petIds) || !in_array($petIdStr, array_map('strval', $petIds), true)) {
+                continue;
+            }
+            $push([
+                'kind' => 'booking',
+                'title' => 'Booking',
+                'subtitle' => (string) ($row['service_code'] ?? ''),
+                'status' => (string) ($row['status'] ?? ''),
+                'occurred_at' => (string) ($row['updated_at'] ?? $row['created_at'] ?? ''),
+                'payload' => ['booking_id' => (string) ($row['id'] ?? '')],
+            ]);
+        }
+    }
+
+    if (v2ApiTableExists($pdo, 'kakiempa_v2_pet_gallery')) {
+        $galStmt = $pdo->prepare(
+            'SELECT id, caption, likes_count, created_at
+             FROM kakiempa_v2_pet_gallery
+             WHERE owner_user_id = ? AND pet_id = ?
+             ORDER BY created_at DESC
+             LIMIT 20',
+        );
+        $galStmt->execute([$userId, $petId]);
+        while ($row = $galStmt->fetch(PDO::FETCH_ASSOC)) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $push([
+                'kind' => 'gallery',
+                'title' => 'Foto galeri',
+                'subtitle' => (string) ($row['caption'] ?? 'Tanpa keterangan'),
+                'occurred_at' => (string) ($row['created_at'] ?? ''),
+                'payload' => [
+                    'gallery_id' => (string) ($row['id'] ?? ''),
+                    'likes' => (int) ($row['likes_count'] ?? 0),
+                ],
+            ]);
+        }
+    }
+
+    usort(
+        $events,
+        static fn(array $a, array $b): int => strcmp(
+            (string) ($b['occurred_at'] ?? ''),
+            (string) ($a['occurred_at'] ?? ''),
+        ),
+    );
+
+    v2ApiRespondData([
+        'pet' => kakiempat_owner_v2_format_pet($petRow),
+        'events' => $events,
+        'total' => count($events),
+    ]);
 }
 
 /** @param array<string, mixed> $row */

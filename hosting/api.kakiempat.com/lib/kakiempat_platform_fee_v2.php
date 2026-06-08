@@ -138,9 +138,9 @@ function kakiempat_platform_fee_v2_apply_for_booking(PDO $pdo, int $bookingId): 
         v2ApiFail('booking_not_found', 'Booking tidak ditemukan.', 404);
     }
 
-    $status = strtoupper((string) ($row['status'] ?? ''));
-    if ($status !== 'PAID') {
-        v2ApiFail('booking_not_paid', 'Biaya platform hanya diproses untuk booking PAID.', 409);
+    $status = strtolower(str_replace(['_', '-'], '', (string) ($row['status'] ?? '')));
+    if ($status !== 'paid') {
+        v2ApiFail('booking_not_paid', 'Biaya platform hanya diproses untuk booking paid.', 409);
     }
 
     $rates = kakiempat_platform_fee_v2_rates();

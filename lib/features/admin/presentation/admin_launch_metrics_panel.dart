@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:kaki_empat/core/config/launch_exit_criteria.dart';
 import 'package:kaki_empat/core/config/mvp_scope.dart';
 import 'package:kaki_empat/core/models/launch_metrics_v2.dart';
 import 'package:kaki_empat/core/services/admin_v2_service.dart';
@@ -7,7 +8,7 @@ import 'package:kaki_empat/features/shared/widgets/v2_error_state.dart';
 import 'package:kaki_empat/features/shared/widgets/v2_loading_skeleton.dart';
 import 'package:kaki_empat/l10n/app_localizations.dart';
 
-/// Panel admin: metrik exit criteria fase [LaunchPhase.ownerFirst].
+/// Panel admin: metrik exit criteria fase peluncuran super-app.
 class AdminLaunchMetricsPanel extends StatefulWidget {
   const AdminLaunchMetricsPanel({super.key});
 
@@ -62,6 +63,86 @@ class _AdminLaunchMetricsPanelState extends State<AdminLaunchMetricsPanel> {
       'hours' => '≤ ${check.target.toStringAsFixed(0)} ${l10n.launchMetricUnitHours}',
       _ => '≥ ${check.target.toStringAsFixed(0)}',
     };
+  }
+
+  String _phaseUnlockSummary(LaunchPhase phase) {
+    return switch (phase) {
+      LaunchPhase.ownerFirst =>
+        'www + owner publik · sitter verified · money engine',
+      LaunchPhase.marketplace =>
+        '+ sitter publik · app switcher antar subdomain',
+      LaunchPhase.growth =>
+        '+ rekomendasi · komunitas · wallet · loyalty · shell navigasi · blog www',
+      LaunchPhase.full =>
+        '+ discover partner · staging · link admin di www',
+    };
+  }
+
+  Widget _phaseRoadmapCard(BuildContext context, AppLocalizations l10n) {
+    final theme = Theme.of(context);
+    final current = MvpScope.phase;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Roadmap fase super-app', style: theme.textTheme.titleSmall),
+            const SizedBox(height: 8),
+            ...MvpScope.rolloutOrder.map((phase) {
+              final active = phase.index <= current.index;
+              final isCurrent = phase == current;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      active ? Icons.check_circle : Icons.lock_outline,
+                      size: 20,
+                      color: active
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.outline,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${phase.name}${isCurrent ? ' (aktif)' : ''}',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontWeight:
+                                  isCurrent ? FontWeight.w700 : FontWeight.w500,
+                            ),
+                          ),
+                          Text(
+                            _phaseUnlockSummary(phase),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+            if (LaunchExitCriteria.nextPhase != null) ...[
+              const Divider(height: 24),
+              Text(
+                'Deploy naik fase: .\\scripts\\deploy_git.ps1 -LaunchPhase ${LaunchExitCriteria.nextPhase!.name}',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -126,6 +207,8 @@ class _AdminLaunchMetricsPanelState extends State<AdminLaunchMetricsPanel> {
               ),
             ),
           ),
+          const SizedBox(height: 16),
+          _phaseRoadmapCard(context, l10n),
           const SizedBox(height: 16),
           Text(l10n.launchMetricsChecksTitle, style: theme.textTheme.titleSmall),
           const SizedBox(height: 8),

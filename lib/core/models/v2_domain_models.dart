@@ -1,3 +1,5 @@
+import 'package:kaki_empat/core/config/denpasar_kecamatan.dart';
+
 class PetV2 {
   const PetV2({
     required this.id,
@@ -33,6 +35,7 @@ class PetV2 {
 class OwnerProfileV2 {
   const OwnerProfileV2({
     this.address = '',
+    this.kecamatan,
     this.latitude,
     this.longitude,
     this.fullName = '',
@@ -40,6 +43,7 @@ class OwnerProfileV2 {
   });
 
   final String address;
+  final String? kecamatan;
   final double? latitude;
   final double? longitude;
   final String fullName;
@@ -49,6 +53,7 @@ class OwnerProfileV2 {
     if (json == null) return const OwnerProfileV2();
     return OwnerProfileV2(
       address: '${json['address'] ?? ''}',
+      kecamatan: DenpasarKecamatan.normalize('${json['kecamatan'] ?? ''}'),
       latitude: (json['latitude'] as num?)?.toDouble(),
       longitude: (json['longitude'] as num?)?.toDouble(),
       fullName: '${json['full_name'] ?? ''}',
@@ -179,6 +184,7 @@ class SitterProfileV2 {
   const SitterProfileV2({
     this.bio = '',
     this.address = '',
+    this.kecamatan,
     this.latitude,
     this.longitude,
     this.status = 'draft',
@@ -190,6 +196,7 @@ class SitterProfileV2 {
 
   final String bio;
   final String address;
+  final String? kecamatan;
   final double? latitude;
   final double? longitude;
   final String status;
@@ -206,6 +213,7 @@ class SitterProfileV2 {
     return SitterProfileV2(
       bio: '${json['bio'] ?? ''}',
       address: '${json['address'] ?? ''}',
+      kecamatan: DenpasarKecamatan.normalize('${json['kecamatan'] ?? ''}'),
       latitude: (json['latitude'] as num?)?.toDouble(),
       longitude: (json['longitude'] as num?)?.toDouble(),
       status: '${json['status'] ?? 'draft'}',
@@ -350,16 +358,19 @@ class ServiceCatalogResult {
 class RequestLocationV2 {
   const RequestLocationV2({
     this.address = '',
+    this.kecamatan,
     this.latitude,
     this.longitude,
   });
 
   final String address;
+  final String? kecamatan;
   final double? latitude;
   final double? longitude;
 
   Map<String, dynamic> toJson() => {
         'address': address,
+        if (kecamatan != null) 'kecamatan': kecamatan,
         if (latitude != null) 'latitude': latitude,
         if (longitude != null) 'longitude': longitude,
       };
@@ -368,6 +379,7 @@ class RequestLocationV2 {
     if (json == null) return const RequestLocationV2();
     return RequestLocationV2(
       address: '${json['address'] ?? ''}',
+      kecamatan: DenpasarKecamatan.normalize('${json['kecamatan'] ?? ''}'),
       latitude: (json['latitude'] as num?)?.toDouble(),
       longitude: (json['longitude'] as num?)?.toDouble(),
     );
@@ -390,10 +402,12 @@ class BookingRequestV2 {
     this.dateLabel = '',
     this.timeRange = '',
     this.location,
+    this.kecamatan,
     this.distanceKm,
     this.serviceLabel = '',
     this.pendingOfferCount = 0,
     this.petNames = const [],
+    this.petSpecies = const [],
   });
 
   final String id;
@@ -410,14 +424,17 @@ class BookingRequestV2 {
   final String dateLabel;
   final String timeRange;
   final RequestLocationV2? location;
+  final String? kecamatan;
   final double? distanceKm;
   final String serviceLabel;
   final int pendingOfferCount;
   final List<String> petNames;
+  final List<String> petSpecies;
 
   factory BookingRequestV2.fromJson(Map<String, dynamic> json) {
     final rawPets = json['pet_ids'];
     final rawPetNames = json['pet_names'];
+    final rawPetSpecies = json['pet_species'];
     final price = (json['price'] as num?)?.toInt() ??
         (json['total_price'] as num?)?.toInt() ??
         0;
@@ -438,11 +455,15 @@ class BookingRequestV2 {
       location: json['location'] is Map<String, dynamic>
           ? RequestLocationV2.fromJson(json['location'] as Map<String, dynamic>)
           : null,
+      kecamatan: DenpasarKecamatan.normalize('${json['kecamatan'] ?? ''}'),
       distanceKm: (json['distance_km'] as num?)?.toDouble(),
       serviceLabel: '${json['service_label'] ?? ''}',
       pendingOfferCount: (json['pending_offer_count'] as num?)?.toInt() ?? 0,
       petNames: rawPetNames is List
           ? rawPetNames.map((e) => '$e').where((n) => n.isNotEmpty).toList()
+          : const [],
+      petSpecies: rawPetSpecies is List
+          ? rawPetSpecies.map((e) => '$e').where((n) => n.isNotEmpty).toList()
           : const [],
     );
   }
@@ -517,6 +538,8 @@ class BookingV2 {
     this.scheduledAt = '',
     this.notes = '',
     this.petIds = const [],
+    this.petNames = const [],
+    this.petSpecies = const [],
     this.createdAt = '',
   });
 
@@ -532,16 +555,21 @@ class BookingV2 {
   final String scheduledAt;
   final String notes;
   final List<String> petIds;
+  final List<String> petNames;
+  final List<String> petSpecies;
   final String createdAt;
 
-  bool get needsPayment =>
-      (status == 'awaitingPayment' || status == 'AWAITING_PAYMENT') &&
-      paymentAmount > 0;
+  bool get needsPayment {
+    final s = status.toLowerCase().replaceAll('_', '');
+    return s == 'awaitingpayment' && paymentAmount > 0;
+  }
 
-  bool get isPaid => status.toUpperCase() == 'PAID';
+  bool get isPaid => status.toLowerCase().replaceAll('_', '') == 'paid';
 
   factory BookingV2.fromJson(Map<String, dynamic> json) {
     final rawPets = json['pet_ids'];
+    final rawPetNames = json['pet_names'];
+    final rawPetSpecies = json['pet_species'];
     return BookingV2(
       id: '${json['id'] ?? ''}',
       offerId: json['offer_id']?.toString(),
@@ -555,6 +583,12 @@ class BookingV2 {
       scheduledAt: '${json['scheduled_at'] ?? ''}',
       notes: '${json['notes'] ?? ''}',
       petIds: rawPets is List ? rawPets.map((e) => '$e').toList() : const [],
+      petNames: rawPetNames is List
+          ? rawPetNames.map((e) => '$e').where((n) => n.isNotEmpty).toList()
+          : const [],
+      petSpecies: rawPetSpecies is List
+          ? rawPetSpecies.map((e) => '$e').where((n) => n.isNotEmpty).toList()
+          : const [],
       createdAt: '${json['created_at'] ?? ''}',
     );
   }
@@ -604,6 +638,91 @@ class PendingSitterV2 {
       hasSelfie: json['has_selfie'] == true,
       ktpData: json['ktp_data'] as String?,
       selfieData: json['selfie_data'] as String?,
+    );
+  }
+}
+
+class PetTimelineEvent {
+  const PetTimelineEvent({
+    required this.kind,
+    required this.title,
+    required this.subtitle,
+    this.status = '',
+    this.occurredAt = '',
+    this.payload = const {},
+  });
+
+  final String kind;
+  final String title;
+  final String subtitle;
+  final String status;
+  final String occurredAt;
+  final Map<String, dynamic> payload;
+
+  factory PetTimelineEvent.fromJson(Map<String, dynamic> json) {
+    final rawPayload = json['payload'];
+    return PetTimelineEvent(
+      kind: '${json['kind'] ?? ''}',
+      title: '${json['title'] ?? ''}',
+      subtitle: '${json['subtitle'] ?? ''}',
+      status: '${json['status'] ?? ''}',
+      occurredAt: '${json['occurred_at'] ?? ''}',
+      payload: rawPayload is Map<String, dynamic> ? rawPayload : const {},
+    );
+  }
+}
+
+class PetTimelineResult {
+  const PetTimelineResult({
+    required this.pet,
+    required this.events,
+    required this.total,
+  });
+
+  final PetV2 pet;
+  final List<PetTimelineEvent> events;
+  final int total;
+
+  factory PetTimelineResult.fromJson(Map<String, dynamic> json) {
+    final rawEvents = json['events'];
+    return PetTimelineResult(
+      pet: PetV2.fromJson(json['pet'] as Map<String, dynamic>? ?? {}),
+      events: rawEvents is List
+          ? rawEvents
+              .whereType<Map<String, dynamic>>()
+              .map(PetTimelineEvent.fromJson)
+              .toList()
+          : const [],
+      total: (json['total'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
+class CategorySupplyResult {
+  const CategorySupplyResult({
+    required this.category,
+    required this.kecamatan,
+    required this.available,
+    required this.totalSupply,
+    this.sitterCount = 0,
+    this.businessCount = 0,
+  });
+
+  final String category;
+  final String kecamatan;
+  final bool available;
+  final int totalSupply;
+  final int sitterCount;
+  final int businessCount;
+
+  factory CategorySupplyResult.fromJson(Map<String, dynamic> json) {
+    return CategorySupplyResult(
+      category: '${json['category'] ?? ''}',
+      kecamatan: '${json['kecamatan'] ?? ''}',
+      available: json['available'] == true,
+      totalSupply: (json['total_supply'] as num?)?.toInt() ?? 0,
+      sitterCount: (json['sitter_count'] as num?)?.toInt() ?? 0,
+      businessCount: (json['business_count'] as num?)?.toInt() ?? 0,
     );
   }
 }

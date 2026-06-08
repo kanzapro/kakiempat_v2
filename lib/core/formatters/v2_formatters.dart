@@ -49,16 +49,48 @@ abstract final class V2Formatters {
     }
   }
 
+  static String petSpeciesEmoji(String species) {
+    final s = species.trim().toLowerCase();
+    return switch (s) {
+      'dog' || 'anjing' => '🐕',
+      'cat' || 'kucing' => '🐈',
+      _ => '🐾',
+    };
+  }
+
+  static String petSpeciesLabel(String species) {
+    final s = species.trim().toLowerCase();
+    return switch (s) {
+      'dog' => 'Anjing',
+      'cat' => 'Kucing',
+      'anjing' => 'Anjing',
+      'kucing' => 'Kucing',
+      _ => species.isNotEmpty ? species : 'Hewan',
+    };
+  }
+
+  /// Contoh: "🐕 Milo (Anjing)"
+  static String petDisplayLabel({
+    required String name,
+    String species = '',
+  }) {
+    final displayName = name.trim().isNotEmpty ? name.trim() : 'Hewan';
+    if (species.trim().isEmpty) {
+      return '${petSpeciesEmoji('')} $displayName';
+    }
+    return '${petSpeciesEmoji(species)} $displayName (${petSpeciesLabel(species)})';
+  }
+
   static String bookingStatusLabel(String status) {
-    return switch (status) {
+    final normalized = status.toLowerCase().replaceAll('_', '');
+    return switch (normalized) {
       'open' => 'Menunggu pengasuh',
       'matched' => 'Sudah ditugaskan',
       'pending' => 'Menunggu konfirmasi',
-      'awaitingPayment' => 'Menunggu pembayaran',
-      'PENDING_VERIFICATION' => 'Verifikasi pembayaran',
-      'PAID' => 'Lunas',
-      'PAYMENT_REJECTED' => 'Pembayaran ditolak',
+      'awaitingpayment' => 'Menunggu pembayaran',
+      'pendingverification' => 'Verifikasi pembayaran',
       'paid' => 'Lunas',
+      'paymentrejected' => 'Pembayaran ditolak',
       'cancelled' => 'Dibatalkan',
       'confirmed' => 'Dikonfirmasi',
       'en_route' => 'Dalam perjalanan',

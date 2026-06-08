@@ -20,6 +20,7 @@ class NotificationsPage extends StatefulWidget {
 class _NotificationsPageState extends State<NotificationsPage> {
   static const _pageSize = 20;
 
+  String? _typeFilter;
   List<AppNotificationV2> _items = [];
   int _unread = 0;
   int _page = 1;
@@ -59,6 +60,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
         NotificationV2Service.instance.getNotifications(
           page: pageNum,
           limit: _pageSize,
+          typeFilter: _typeFilter,
         ),
         NotificationV2Service.instance.checkNew(),
       ]);
@@ -142,7 +144,18 @@ class _NotificationsPageState extends State<NotificationsPage> {
         ],
       ),
       body: V2Responsive.constrain(
-        _loading
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: Row(
+                children: _filterChips(l10n),
+              ),
+            ),
+            Expanded(
+              child: _loading
             ? const V2ListSkeleton()
             : _error != null && _items.isEmpty
                 ? V2ErrorState.fromError(
@@ -243,9 +256,37 @@ class _NotificationsPageState extends State<NotificationsPage> {
                             },
                           ),
                   ),
+            ),
+          ],
+        ),
         context,
       ),
     );
+  }
+
+  List<Widget> _filterChips(AppLocalizations l10n) {
+    final filters = <(String?, String)>[
+      (null, l10n.notificationsFilterAll),
+      ('booking', l10n.notificationsFilterBooking),
+      ('payment', l10n.notificationsFilterPayment),
+      ('chat', l10n.notificationsFilterChat),
+      ('loyalty', l10n.notificationsFilterLoyalty),
+    ];
+
+    return filters.map((entry) {
+      final selected = _typeFilter == entry.$1;
+      return Padding(
+        padding: const EdgeInsets.only(right: 8),
+        child: FilterChip(
+          label: Text(entry.$2),
+          selected: selected,
+          onSelected: (_) {
+            setState(() => _typeFilter = entry.$1);
+            _load(reset: true);
+          },
+        ),
+      );
+    }).toList();
   }
 
   static IconData _iconForType(String type) {

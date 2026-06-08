@@ -2110,6 +2110,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get discoverEmpty => 'No partner services yet.';
 
   @override
+  String get discoverBusinessesTitle => 'Verified business partners';
+
+  @override
+  String get discoverServicesTitle => 'Partner mini-services';
+
+  @override
   String get discoverComingSoon =>
       'Partner services unlock in the full launch phase.';
 
@@ -2150,4 +2156,69 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get referralCopied => 'Referral code copied';
+
+  @override
+  String get appShellProfile => 'Profile';
+
+  @override
+  String get petTimelineTitle => 'Pet timeline';
+
+  @override
+  String get petTimelineSubtitle => 'Activity history';
+
+  @override
+  String get petTimelineEmpty => 'No activity yet for this pet.';
+
+  @override
+  String get notificationsFilterAll => 'All';
+
+  @override
+  String get notificationsFilterBooking => 'Bookings';
+
+  @override
+  String get notificationsFilterPayment => 'Payments';
+
+  @override
+  String get notificationsFilterChat => 'Chat';
+
+  @override
+  String get notificationsFilterLoyalty => 'Loyalty';
+
+  @override
+  String get categoryFormHealthTitle => 'Health visit details';
+
+  @override
+  String get categoryFormHealthSymptoms => 'Symptoms or concerns';
+
+  @override
+  String get categoryFormHealthUrgent => 'Urgent — needs same-day attention';
+
+  @override
+  String get categoryFormGroomingTitle => 'Grooming preferences';
+
+  @override
+  String get categoryFormGroomingPackage => 'Package or style';
+
+  @override
+  String get categoryFormGroomingPackageHint =>
+      'e.g. full bath, nail trim, breed cut';
+
+  @override
+  String get categoryFormTransportTitle => 'Transport details';
+
+  @override
+  String get categoryFormTransportPickup => 'Pickup address';
+
+  @override
+  String get categoryFormTransportDropoff => 'Drop-off address';
+
+  @override
+  String get categoryFormTransportCrate => 'Crate size';
+
+  @override
+  String get categorySupplyUnavailable =>
+      'This service category is not yet available in your area.';
+
+  @override
+  String get appSwitcherPartner => 'Partner dashboard';
 }

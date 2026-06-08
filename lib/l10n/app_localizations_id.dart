@@ -2126,6 +2126,12 @@ class AppLocalizationsId extends AppLocalizations {
   String get discoverEmpty => 'Belum ada layanan partner.';
 
   @override
+  String get discoverBusinessesTitle => 'Mitra bisnis terverifikasi';
+
+  @override
+  String get discoverServicesTitle => 'Mini-layanan partner';
+
+  @override
   String get discoverComingSoon =>
       'Layanan partner terbuka di fase peluncuran penuh.';
 
@@ -2167,4 +2173,69 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get referralCopied => 'Kode referral disalin';
+
+  @override
+  String get appShellProfile => 'Profil';
+
+  @override
+  String get petTimelineTitle => 'Linimasa hewan';
+
+  @override
+  String get petTimelineSubtitle => 'Riwayat aktivitas';
+
+  @override
+  String get petTimelineEmpty => 'Belum ada aktivitas untuk hewan ini.';
+
+  @override
+  String get notificationsFilterAll => 'Semua';
+
+  @override
+  String get notificationsFilterBooking => 'Booking';
+
+  @override
+  String get notificationsFilterPayment => 'Pembayaran';
+
+  @override
+  String get notificationsFilterChat => 'Chat';
+
+  @override
+  String get notificationsFilterLoyalty => 'Loyalitas';
+
+  @override
+  String get categoryFormHealthTitle => 'Detail kunjungan kesehatan';
+
+  @override
+  String get categoryFormHealthSymptoms => 'Gejala atau keluhan';
+
+  @override
+  String get categoryFormHealthUrgent => 'Mendesak — butuh penanganan hari ini';
+
+  @override
+  String get categoryFormGroomingTitle => 'Preferensi grooming';
+
+  @override
+  String get categoryFormGroomingPackage => 'Paket atau gaya';
+
+  @override
+  String get categoryFormGroomingPackageHint =>
+      'mis. mandi lengkap, potong kuku, potong ras';
+
+  @override
+  String get categoryFormTransportTitle => 'Detail transport';
+
+  @override
+  String get categoryFormTransportPickup => 'Alamat jemput';
+
+  @override
+  String get categoryFormTransportDropoff => 'Alamat antar';
+
+  @override
+  String get categoryFormTransportCrate => 'Ukuran kandang';
+
+  @override
+  String get categorySupplyUnavailable =>
+      'Kategori layanan ini belum tersedia di area Anda.';
+
+  @override
+  String get appSwitcherPartner => 'Dashboard partner';
 }

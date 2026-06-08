@@ -5,7 +5,8 @@ import 'package:kaki_empat/core/theme/app_colors.dart';
 import 'package:kaki_empat/core/web/sso_nav.dart';
 import 'package:kaki_empat/core/web/web_nav.dart';
 import 'package:kaki_empat/features/auth/presentation/login_page.dart';
-import 'package:kaki_empat/features/auth/presentation/register_page.dart';import 'package:kaki_empat/features/shared/widgets/logo_widget.dart';
+import 'package:kaki_empat/features/auth/presentation/register_page.dart';
+import 'package:kaki_empat/features/shared/widgets/logo_widget.dart';
 import 'package:kaki_empat/l10n/app_localizations.dart';
 
 class SitterLandingPage extends StatelessWidget {

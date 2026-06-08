@@ -12,10 +12,13 @@ import 'package:kaki_empat/features/owner/presentation/add_pet_page.dart';
 import 'package:kaki_empat/features/owner/presentation/create_request_page.dart';
 import 'package:kaki_empat/features/owner/presentation/owner_profile_page.dart';
 import 'package:kaki_empat/features/owner/presentation/owner_profile_setup_page.dart';
+import 'package:kaki_empat/features/owner/presentation/pet_timeline_page.dart';
 import 'package:kaki_empat/features/owner/presentation/owner_request_offers_page.dart';
 import 'package:kaki_empat/features/owner/presentation/payment_guide_page.dart';
 import 'package:kaki_empat/features/shared/presentation/booking_detail_page.dart';
 import 'package:kaki_empat/features/shared/presentation/booking_history_page.dart';
+import 'package:kaki_empat/features/shared/presentation/discover_page.dart';
+import 'package:kaki_empat/features/shared/presentation/sitter_detail_page.dart';
 import 'package:kaki_empat/features/shared/widgets/notification_badge_button.dart';
 import 'package:kaki_empat/features/shared/widgets/v2_app_switcher.dart';
 import 'package:kaki_empat/features/shared/widgets/v2_app_shell.dart';
@@ -194,6 +197,13 @@ class _OwnerHomePageState extends State<OwnerHomePage> {
         return s != 'completed' && s != 'cancelled';
       }).toList();
 
+  BookingV2? _activeBookingForPet(String petId) {
+    for (final booking in _activeBookings) {
+      if (booking.petIds.contains(petId)) return booking;
+    }
+    return null;
+  }
+
   List<BookingRequestV2> get _requestsWithOffers => _openRequests
       .where((r) => r.pendingOfferCount > 0)
       .toList();
@@ -211,6 +221,44 @@ class _OwnerHomePageState extends State<OwnerHomePage> {
     final name = _profile?.profile?.fullName.trim();
     if (name != null && name.isNotEmpty) return name;
     return 'Owner';
+  }
+
+  String _bookingPetLine(BookingV2 booking) {
+    if (booking.petNames.isNotEmpty) {
+      final labels = <String>[];
+      for (var i = 0; i < booking.petNames.length; i++) {
+        final species = i < booking.petSpecies.length ? booking.petSpecies[i] : '';
+        labels.add(
+          V2Formatters.petDisplayLabel(name: booking.petNames[i], species: species),
+        );
+      }
+      return labels.join(', ');
+    }
+    final pets = _profile?.pets ?? [];
+    final names = <String>[];
+    for (final petId in booking.petIds) {
+      for (final pet in pets) {
+        if (pet.id == petId) {
+          names.add(V2Formatters.petDisplayLabel(name: pet.name, species: pet.species));
+          break;
+        }
+      }
+    }
+    if (names.isNotEmpty) return names.join(', ');
+    if (booking.petIds.isNotEmpty) return 'Hewan #${booking.petIds.first}';
+    return '';
+  }
+
+  String _bookingCardMeta(BookingV2 booking) {
+    final parts = <String>[];
+    if (booking.paymentAmount > 0) {
+      parts.add('💰 ${V2Formatters.money(booking.paymentAmount)}');
+    }
+    final petLine = _bookingPetLine(booking);
+    if (petLine.isNotEmpty) {
+      parts.add(petLine);
+    }
+    return parts.join(' · ');
   }
 
   static const _popularCategoryCodes = ['sports', 'boarding', 'grooming', 'health'];
@@ -243,6 +291,48 @@ class _OwnerHomePageState extends State<OwnerHomePage> {
 
   Future<void> _handleRecommendation(OwnerRecommendationV2 item) async {
     switch (item.action) {
+      case 'open_sitter':
+        final sitterId = item.payload['sitter_user_id'];
+        if (sitterId == null || sitterId.isEmpty || !mounted) break;
+        await Navigator.of(context).push(
+          V2PageRoute(
+            page: SitterDetailPage(
+              sitterUserId: sitterId,
+              sitterName: item.payload['sitter_name']?.isNotEmpty == true
+                  ? item.payload['sitter_name']!
+                  : item.subtitle,
+            ),
+          ),
+        );
+      case 'open_payment':
+        final bookingId = item.payload['booking_id'];
+        if (bookingId == null || bookingId.isEmpty || !mounted) break;
+        await Navigator.of(context).push(
+          V2PageRoute(page: PaymentGuidePage(bookingId: bookingId)),
+        );
+      case 'open_request_offers':
+        final requestId = item.payload['request_id'];
+        if (requestId == null || requestId.isEmpty) break;
+        BookingRequestV2? request;
+        for (final candidate in _openRequests) {
+          if (candidate.id == requestId) {
+            request = candidate;
+            break;
+          }
+        }
+        if (request != null) {
+          await _openRequestOffers(request);
+        }
+      case 'open_discover':
+        if (!mounted) break;
+        await Navigator.of(context).push(
+          V2PageRoute(page: const DiscoverPage()),
+        );
+      case 'open_community':
+        if (!mounted) break;
+        await Navigator.of(context).push(
+          V2PageRoute(page: const PetGalleryPage()),
+        );
       case 'open_catalog':
         await _openFirstCategoryWithService();
       case 'open_service':
@@ -251,7 +341,7 @@ class _OwnerHomePageState extends State<OwnerHomePage> {
           await _openCategoryByCode(code);
         }
       case 'open_tips':
-        if (!mounted) return;
+        if (!mounted) break;
         await Navigator.of(context).push(
           V2PageRoute(page: const TipsArticlesPage()),
         );
@@ -578,7 +668,20 @@ class _OwnerHomePageState extends State<OwnerHomePage> {
                                   );
                                 }
                                 final pet = pets[index];
-                                return Container(
+                                final activeBooking = _activeBookingForPet(pet.id);
+                                return InkWell(
+                                  onTap: activeBooking != null
+                                      ? () => _openBooking(activeBooking)
+                                      : () => Navigator.of(context).push(
+                                            V2PageRoute(
+                                              page: PetTimelinePage(
+                                                petId: pet.id,
+                                                petName: pet.name,
+                                              ),
+                                            ),
+                                          ),
+                                  borderRadius: BorderRadius.circular(16),
+                                  child: Container(
                                   width: 168,
                                   padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
@@ -612,6 +715,10 @@ class _OwnerHomePageState extends State<OwnerHomePage> {
                                         ],
                                       ),
                                       const SizedBox(height: 10),
+                                      if (activeBooking != null) ...[
+                                        BookingStatusChip(status: activeBooking.status),
+                                        const SizedBox(height: 8),
+                                      ],
                                       Wrap(
                                         spacing: 4,
                                         runSpacing: 4,
@@ -638,6 +745,7 @@ class _OwnerHomePageState extends State<OwnerHomePage> {
                                       ),
                                     ],
                                   ),
+                                ),
                                 );
                               },
                             ),
@@ -667,7 +775,7 @@ class _OwnerHomePageState extends State<OwnerHomePage> {
                             message: l10n.ownerActiveBookingsEmpty,
                             emoji: '📅',
                           )
-                        else
+                        else ...[
                           ..._activeBookings.take(3).map((b) {
                             return Card(
                               margin: const EdgeInsets.only(bottom: 8),
@@ -689,6 +797,10 @@ class _OwnerHomePageState extends State<OwnerHomePage> {
                                     BookingStatusChip(status: b.status),
                                     const SizedBox(height: 6),
                                     Text(V2Formatters.dateTime(b.scheduledAt)),
+                                    if (_bookingCardMeta(b).isNotEmpty) ...[
+                                      const SizedBox(height: 6),
+                                      Text(_bookingCardMeta(b)),
+                                    ],
                                   ],
                                 ),
                                 isThreeLine: true,
@@ -697,6 +809,20 @@ class _OwnerHomePageState extends State<OwnerHomePage> {
                               ),
                             );
                           }),
+                          if (_activeBookings.length > 3)
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: TextButton.icon(
+                                onPressed: () {
+                                  Navigator.of(context).push(
+                                    V2PageRoute(page: const BookingHistoryPage()),
+                                  );
+                                },
+                                icon: const Icon(Icons.history),
+                                label: Text(l10n.tooltipBookingHistory),
+                              ),
+                            ),
+                        ],
                         if (!MvpScope.hideOwnerFavorites) ...[
                           const SizedBox(height: 24),
                           Text(l10n.ownerFavoriteSittersTitle, style: theme.textTheme.titleMedium),

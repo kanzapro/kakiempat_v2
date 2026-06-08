@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:kaki_empat/core/config/app_config.dart';
+import 'package:kaki_empat/core/config/denpasar_kecamatan.dart';
 import 'package:kaki_empat/core/formatters/v2_formatters.dart';
 import 'package:kaki_empat/core/models/v2_domain_models.dart';
 import 'package:kaki_empat/core/services/marketplace_v2_service.dart';
+import 'package:kaki_empat/core/services/service_v2_service.dart';
 import 'package:kaki_empat/core/services/v2_api_client.dart';
-import 'package:kaki_empat/core/utils/geolocation_capture.dart';
+import 'package:kaki_empat/features/shared/widgets/category_booking_fields.dart';
+import 'package:kaki_empat/features/shared/widgets/kecamatan_dropdown.dart';
 import 'package:kaki_empat/features/shared/widgets/v2_pet_avatar.dart';
 import 'package:kaki_empat/core/utils/v2_feedback.dart';
 import 'package:kaki_empat/l10n/app_localizations.dart';
@@ -38,8 +41,10 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
   bool _estimatingSitters = false;
   int? _estimatedSitterCount;
   String? _error;
-  double? _latitude;
-  double? _longitude;
+  String? _kecamatan;
+  String _categoryExtraNotes = '';
+  bool _checkingSupply = false;
+  bool? _categoryAvailable;
 
   @override
   void initState() {
@@ -48,35 +53,50 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
     if (profile != null && profile.address.isNotEmpty) {
       _locationController.text = profile.address;
     }
-    _latitude = profile?.latitude;
-    _longitude = profile?.longitude;
+    _kecamatan = profile?.kecamatan;
     if (widget.pets.length == 1) {
       _selectedPetIds.add(widget.pets.first.id);
     }
-    _initCoordinates();
+    _refreshSitterEstimate();
+    _refreshCategorySupply();
   }
 
-  Future<void> _initCoordinates() async {
-    final coords = await resolveCoordinates(
-      storedLatitude: _latitude,
-      storedLongitude: _longitude,
-    );
-    if (!mounted) return;
-    setState(() {
-      _latitude = coords?.latitude ?? _latitude;
-      _longitude = coords?.longitude ?? _longitude;
-    });
-    await _refreshSitterEstimate();
+  Future<void> _refreshCategorySupply() async {
+    if (!categoryRequiresSupplyCheck(widget.service.category)) {
+      if (!mounted) return;
+      setState(() => _categoryAvailable = true);
+      return;
+    }
+    final kecamatan = _kecamatan;
+    if (!DenpasarKecamatan.isValid(kecamatan)) {
+      if (!mounted) return;
+      setState(() => _categoryAvailable = null);
+      return;
+    }
+
+    setState(() => _checkingSupply = true);
+    try {
+      final supply = await ServiceV2Service.instance.checkCategorySupply(
+        category: widget.service.category,
+        kecamatan: kecamatan!,
+      );
+      if (!mounted) return;
+      setState(() {
+        _categoryAvailable = supply.available;
+        _checkingSupply = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _categoryAvailable = null;
+        _checkingSupply = false;
+      });
+    }
   }
-
-  double? get _requestLatitude => _latitude;
-
-  double? get _requestLongitude => _longitude;
 
   Future<void> _refreshSitterEstimate() async {
-    final lat = _requestLatitude;
-    final lng = _requestLongitude;
-    if (lat == null || lng == null) {
+    final kecamatan = _kecamatan;
+    if (!DenpasarKecamatan.isValid(kecamatan)) {
       if (!mounted) return;
       setState(() {
         _estimatedSitterCount = null;
@@ -89,12 +109,11 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
     try {
       final estimate = await MarketplaceV2Service.instance.estimateBroadcast(
         serviceType: widget.service.code,
-        latitude: lat,
-        longitude: lng,
+        kecamatan: kecamatan,
       );
       if (!mounted) return;
       setState(() {
-        _estimatedSitterCount = estimate.sitterCountInRadius;
+        _estimatedSitterCount = estimate.sitterCount;
         _estimatingSitters = false;
       });
     } catch (_) {
@@ -177,6 +196,15 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
       setState(() => _error = l10n.createRequestLocationRequired);
       return;
     }
+    if (!DenpasarKecamatan.isValid(_kecamatan)) {
+      setState(() => _error = 'Pilih kecamatan Denpasar.');
+      return;
+    }
+    if (categoryRequiresSupplyCheck(widget.service.category) &&
+        _categoryAvailable == false) {
+      setState(() => _error = 'Belum ada pengasuh tersedia untuk kategori ini di kecamatan terpilih.');
+      return;
+    }
     final price = int.tryParse(_priceController.text.replaceAll(RegExp(r'\D'), '')) ?? 0;
     if (price <= 0) {
       setState(() => _error = l10n.createRequestPriceRequired);
@@ -191,22 +219,9 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
     try {
       final locale = Localizations.localeOf(context).toString();
       final dateLabel = DateFormat.yMMMd(locale).format(_date!);
-      final coords = await resolveCoordinates(
-        storedLatitude: _latitude,
-        storedLongitude: _longitude,
-      );
-      if (coords == null) {
-        if (!mounted) return;
-        setState(() {
-          _error = l10n.ownerProfileLocationHint;
-          _submitting = false;
-        });
-        return;
-      }
       final location = <String, dynamic>{
         'address': _locationController.text.trim(),
-        'latitude': coords.latitude,
-        'longitude': coords.longitude,
+        'kecamatan': _kecamatan,
       };
 
       final result = await MarketplaceV2Service.instance.createRequest(
@@ -215,13 +230,15 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
         dateLabel: dateLabel,
         timeRange: _timeRangeLabel(),
         location: location,
+        kecamatan: _kecamatan,
         price: price,
-        notes: _notesController.text.trim(),
+        notes: _composeNotes(),
       );
 
       if (!mounted) return;
-      final successMessage = result.sitterCountInRadius != null
-          ? l10n.createRequestSuccessBroadcast(result.sitterCountInRadius!)
+      final count = result.sitterCountInKecamatan ?? result.sitterCountInRadius;
+      final successMessage = count != null
+          ? 'Permintaan dikirim. ~$count pengasuh di $_kecamatan akan melihat permintaan ini.'
           : l10n.createRequestSuccess;
       V2Feedback.showSuccess(context, successMessage);
       Navigator.of(context).pop(true);
@@ -238,6 +255,13 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
         _submitting = false;
       });
     }
+  }
+
+  String _composeNotes() {
+    final base = _notesController.text.trim();
+    if (_categoryExtraNotes.trim().isEmpty) return base;
+    if (base.isEmpty) return _categoryExtraNotes.trim();
+    return '$base\n\n${_categoryExtraNotes.trim()}';
   }
 
   @override
@@ -312,8 +336,18 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 16),
+            KecamatanDropdown(
+              value: _kecamatan,
+              onChanged: (value) {
+                setState(() => _kecamatan = value);
+                _refreshSitterEstimate();
+                _refreshCategorySupply();
+              },
+            ),
+            const SizedBox(height: 12),
             TextFormField(
               controller: _locationController,
+              onChanged: (_) => setState(() {}),
               decoration: InputDecoration(
                 labelText: l10n.createRequestLocation,
                 border: const OutlineInputBorder(),
@@ -322,7 +356,34 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
               minLines: 1,
               maxLines: 2,
             ),
-            if (_requestLatitude != null && _requestLongitude != null) ...[
+            if (categoryHasBookingFields(widget.service.category)) ...[
+              const SizedBox(height: 16),
+              if (categoryRequiresSupplyCheck(widget.service.category)) ...[
+                if (_checkingSupply)
+                  Text(
+                    l10n.createRequestSitterEstimateLoading,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  )
+                else if (_categoryAvailable == false)
+                  Text(
+                    'Belum ada pengasuh tersedia untuk kategori ini di kecamatan terpilih.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                  ),
+              ],
+              CategoryBookingFields(
+                category: widget.service.category,
+                summaryPetNames: widget.pets
+                    .where((p) => _selectedPetIds.contains(p.id))
+                    .map((p) => p.name)
+                    .toList(),
+                summaryDuration: l10n.createRequestDurationHours(_durationHours),
+                summaryLocation: _locationController.text.trim(),
+                onChanged: (value) => setState(() => _categoryExtraNotes = value),
+              ),
+            ],
+            if (DenpasarKecamatan.isValid(_kecamatan)) ...[
               const SizedBox(height: 8),
               if (_estimatingSitters)
                 Text(
@@ -331,7 +392,7 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
                 )
               else if (_estimatedSitterCount != null)
                 Text(
-                  l10n.createRequestSitterEstimate(_estimatedSitterCount!),
+                  'Estimasi ~$_estimatedSitterCount pengasuh di $_kecamatan akan melihat permintaan ini.',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
             ],
@@ -367,7 +428,11 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
             ],
             const SizedBox(height: 24),
             FilledButton(
-              onPressed: _submitting ? null : _submit,
+              onPressed: (_submitting ||
+                      (categoryRequiresSupplyCheck(widget.service.category) &&
+                          _categoryAvailable == false))
+                  ? null
+                  : _submit,
               child: _submitting
                   ? const SizedBox(
                       height: 20,

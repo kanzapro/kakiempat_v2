@@ -2,11 +2,12 @@ import 'dart:convert';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:kaki_empat/core/config/denpasar_kecamatan.dart';
 import 'package:kaki_empat/core/models/v2_domain_models.dart';
 import 'package:kaki_empat/core/services/service_catalog_v2_service.dart';
 import 'package:kaki_empat/core/services/sitter_v2_service.dart';
 import 'package:kaki_empat/core/services/v2_api_client.dart';
-import 'package:kaki_empat/core/utils/geolocation_capture.dart';
+import 'package:kaki_empat/features/shared/widgets/kecamatan_dropdown.dart';
 import 'package:kaki_empat/features/shared/widgets/service_category_icon.dart';
 import 'package:kaki_empat/features/shared/widgets/event_notification_shell.dart';
 import 'package:kaki_empat/features/sitter/presentation/sitter_home_page.dart';
@@ -40,8 +41,7 @@ class _SitterOnboardingPageState extends State<SitterOnboardingPage> {
   String? _error;
   String? _ktpData;
   String? _selfieData;
-  double? _storedLatitude;
-  double? _storedLongitude;
+  String? _kecamatan;
 
   @override
   void initState() {
@@ -56,8 +56,7 @@ class _SitterOnboardingPageState extends State<SitterOnboardingPage> {
       if (!mounted) return;
       _address.text = profile.profile?.address ?? '';
       _bio.text = profile.profile?.bio ?? '';
-      _storedLatitude = profile.profile?.latitude;
-      _storedLongitude = profile.profile?.longitude;
+      _kecamatan = profile.profile?.kecamatan;
       _selectedServices.addAll(profile.services);
       if (profile.profile?.isPending == true) {
         setState(() => _submitted = true);
@@ -102,6 +101,10 @@ class _SitterOnboardingPageState extends State<SitterOnboardingPage> {
     if (_step == 1 && !_formKey.currentState!.validate()) {
       return;
     }
+    if (_step == 1 && !DenpasarKecamatan.isValid(_kecamatan)) {
+      setState(() => _error = 'Pilih kecamatan Denpasar.');
+      return;
+    }
     final maxStep = widget.editOnly ? 1 : 2;
     setState(() {
       _error = null;
@@ -122,21 +125,20 @@ class _SitterOnboardingPageState extends State<SitterOnboardingPage> {
       setState(() => _error = AppLocalizations.of(context)!.sitterOnboardingServicesRequired);
       return;
     }
+    if (!DenpasarKecamatan.isValid(_kecamatan)) {
+      setState(() => _error = 'Pilih kecamatan Denpasar.');
+      return;
+    }
     setState(() {
       _submitting = true;
       _error = null;
     });
     try {
-      final coords = await resolveCoordinates(
-        storedLatitude: _storedLatitude,
-        storedLongitude: _storedLongitude,
-      );
       await SitterV2Service.instance.saveProfile(
         address: _address.text.trim(),
         bio: _bio.text.trim(),
         services: _selectedServices.toList(),
-        latitude: coords?.latitude,
-        longitude: coords?.longitude,
+        kecamatan: _kecamatan!,
       );
       if (!mounted) return;
       Navigator.of(context).pop(true);
@@ -184,6 +186,10 @@ class _SitterOnboardingPageState extends State<SitterOnboardingPage> {
       setState(() => _error = AppLocalizations.of(context)!.sitterVerificationDocsRequired);
       return;
     }
+    if (!DenpasarKecamatan.isValid(_kecamatan)) {
+      setState(() => _error = 'Pilih kecamatan Denpasar.');
+      return;
+    }
 
     setState(() {
       _submitting = true;
@@ -191,16 +197,11 @@ class _SitterOnboardingPageState extends State<SitterOnboardingPage> {
     });
 
     try {
-      final coords = await resolveCoordinates(
-        storedLatitude: _storedLatitude,
-        storedLongitude: _storedLongitude,
-      );
       await SitterV2Service.instance.saveProfile(
         address: _address.text.trim(),
         bio: _bio.text.trim(),
         services: _selectedServices.toList(),
-        latitude: coords?.latitude,
-        longitude: coords?.longitude,
+        kecamatan: _kecamatan!,
       );
       await SitterV2Service.instance.uploadVerification(
         ktpData: _ktpData!,
@@ -419,6 +420,11 @@ class _SitterOnboardingPageState extends State<SitterOnboardingPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          KecamatanDropdown(
+            value: _kecamatan,
+            onChanged: (value) => setState(() => _kecamatan = value),
+          ),
+          const SizedBox(height: 12),
           TextFormField(
             controller: _address,
             decoration: InputDecoration(

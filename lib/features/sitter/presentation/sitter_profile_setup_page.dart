@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:kaki_empat/core/config/denpasar_kecamatan.dart';
 import 'package:kaki_empat/core/models/v2_domain_models.dart';
 import 'package:kaki_empat/core/services/service_catalog_v2_service.dart';
 import 'package:kaki_empat/core/services/sitter_v2_service.dart';
 import 'package:kaki_empat/core/services/v2_api_client.dart';
+import 'package:kaki_empat/features/shared/widgets/kecamatan_dropdown.dart';
 
 class SitterProfileSetupPage extends StatefulWidget {
   const SitterProfileSetupPage({super.key, this.initial});
@@ -26,11 +28,13 @@ class _SitterProfileSetupPageState extends State<SitterProfileSetupPage> {
   bool _loadingCatalog = true;
   bool _submitting = false;
   String? _error;
+  String? _kecamatan;
 
   @override
   void initState() {
     super.initState();
     _selectedServices.addAll(widget.initial?.services ?? []);
+    _kecamatan = widget.initial?.profile?.kecamatan;
     _loadCatalog();
   }
 
@@ -64,6 +68,10 @@ class _SitterProfileSetupPageState extends State<SitterProfileSetupPage> {
       setState(() => _error = 'Pilih minimal satu layanan.');
       return;
     }
+    if (!DenpasarKecamatan.isValid(_kecamatan)) {
+      setState(() => _error = 'Pilih kecamatan Denpasar.');
+      return;
+    }
 
     setState(() {
       _submitting = true;
@@ -74,6 +82,7 @@ class _SitterProfileSetupPageState extends State<SitterProfileSetupPage> {
         address: _address.text.trim(),
         bio: _bio.text.trim(),
         services: _selectedServices.toList(),
+        kecamatan: _kecamatan!,
       );
       if (submitVerification) {
         await SitterV2Service.instance.submitVerification();
@@ -108,6 +117,11 @@ class _SitterProfileSetupPageState extends State<SitterProfileSetupPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    KecamatanDropdown(
+                      value: _kecamatan,
+                      onChanged: (value) => setState(() => _kecamatan = value),
+                    ),
+                    const SizedBox(height: 12),
                     TextFormField(
                       controller: _address,
                       decoration: const InputDecoration(

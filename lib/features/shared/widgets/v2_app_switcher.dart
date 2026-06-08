@@ -43,6 +43,14 @@ class V2AppSwitcher extends StatelessWidget {
               label: AppLocalizations.of(ctx)!.appSwitcherSitter,
               enabled: MvpScope.isTargetReachable('sitter', user),
             ),
+            if (user?.isPartner == true)
+              _item(
+                ctx,
+                target: 'sitter',
+                icon: Icons.storefront_outlined,
+                label: AppLocalizations.of(ctx)!.appSwitcherPartner,
+                enabled: MvpScope.isTargetReachable('sitter', user),
+              ),
             if (user?.isAdmin == true || user?.isFounder == true)
               _item(
                 ctx,

@@ -5,6 +5,7 @@ require_once dirname(__DIR__) . '/v2_api_common.php';
 require_once __DIR__ . '/kakiempat_auth_v2.php';
 require_once __DIR__ . '/kakiempat_event_notifications.php';
 require_once __DIR__ . '/kakiempat_platform_fee_v2.php';
+require_once __DIR__ . '/kakiempat_booking_v2.php';
 
 /** @return array<string, mixed> */
 function kakiempat_payment_v2_config(): array
@@ -163,8 +164,8 @@ function kakiempat_payment_v2_submit_proof(PDO $pdo, array $user, array $body): 
         v2ApiFail('forbidden', 'Booking ini bukan milik Anda.', 403);
     }
 
-    $status = (string) $booking['status'];
-    $allowed = ['awaitingPayment', 'AWAITING_PAYMENT', 'PAYMENT_REJECTED'];
+    $status = kakiempat_booking_v2_normalize_status((string) $booking['status']);
+    $allowed = ['awaiting_payment', 'payment_rejected'];
     if (!in_array($status, $allowed, true)) {
         v2ApiFail(
             'invalid_booking_status',
@@ -181,7 +182,7 @@ function kakiempat_payment_v2_submit_proof(PDO $pdo, array $user, array $body): 
     $pdo->beginTransaction();
     try {
         $pdo->prepare(
-            "UPDATE kakiempa_v2_bookings SET status = 'PENDING_VERIFICATION' WHERE id = ?",
+            "UPDATE kakiempa_v2_bookings SET status = 'pending_verification' WHERE id = ?",
         )->execute([$bookingId]);
 
         $pdo->prepare(
@@ -196,7 +197,7 @@ function kakiempat_payment_v2_submit_proof(PDO $pdo, array $user, array $body): 
             'ok' => true,
             'proof_id' => (string) $proofId,
             'booking_id' => (string) $bookingId,
-            'status' => 'PENDING_VERIFICATION',
+            'status' => 'pending_verification',
             'display_label' => 'Menunggu Verifikasi',
         ]);
     } catch (Throwable $e) {
@@ -218,7 +219,7 @@ function kakiempat_payment_v2_list_pending(PDO $pdo): array
          FROM kakiempa_payment_proofs p
          INNER JOIN kakiempa_v2_bookings b ON b.id = p.booking_id
          LEFT JOIN kakiempa_v2_users u ON u.id = b.owner_user_id
-         WHERE p.status = 'pending' AND b.status = 'PENDING_VERIFICATION'
+         WHERE p.status = 'pending' AND LOWER(b.status) IN ('pending_verification', 'pendingverification')
          ORDER BY p.created_at ASC",
     );
     $rows = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
@@ -248,13 +249,13 @@ function kakiempat_payment_v2_admin_approve(PDO $pdo, array $body): void
     }
 
     $booking = kakiempat_payment_v2_get_booking($pdo, $bookingId);
-    if ((string) $booking['status'] !== 'PENDING_VERIFICATION') {
+    if (!kakiempat_booking_v2_status_is((string) $booking['status'], 'pending_verification')) {
         v2ApiFail('invalid_booking_status', 'Booking tidak menunggu verifikasi.', 409);
     }
 
     $pdo->beginTransaction();
     try {
-        $pdo->prepare("UPDATE kakiempa_v2_bookings SET status = 'PAID' WHERE id = ?")
+        $pdo->prepare("UPDATE kakiempa_v2_bookings SET status = 'paid' WHERE id = ?")
             ->execute([$bookingId]);
         $pdo->prepare(
             "UPDATE kakiempa_payment_proofs SET status = 'approved'
@@ -272,7 +273,7 @@ function kakiempat_payment_v2_admin_approve(PDO $pdo, array $body): void
         v2ApiRespond([
             'ok' => true,
             'booking_id' => (string) $bookingId,
-            'status' => 'PAID',
+            'status' => 'paid',
             'platform_fee_breakdown' => $platformFeeBreakdown,
         ]);
     } catch (Throwable $e) {
@@ -292,13 +293,13 @@ function kakiempat_payment_v2_admin_reject(PDO $pdo, array $body): void
     }
 
     $booking = kakiempat_payment_v2_get_booking($pdo, $bookingId);
-    if ((string) $booking['status'] !== 'PENDING_VERIFICATION') {
+    if (!kakiempat_booking_v2_status_is((string) $booking['status'], 'pending_verification')) {
         v2ApiFail('invalid_booking_status', 'Booking tidak menunggu verifikasi.', 409);
     }
 
     $pdo->beginTransaction();
     try {
-        $pdo->prepare("UPDATE kakiempa_v2_bookings SET status = 'PAYMENT_REJECTED' WHERE id = ?")
+        $pdo->prepare("UPDATE kakiempa_v2_bookings SET status = 'payment_rejected' WHERE id = ?")
             ->execute([$bookingId]);
         $pdo->prepare(
             "UPDATE kakiempa_payment_proofs SET status = 'rejected'

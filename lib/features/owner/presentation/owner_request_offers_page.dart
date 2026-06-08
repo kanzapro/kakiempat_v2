@@ -170,7 +170,8 @@ class _OwnerRequestOffersPageState extends State<OwnerRequestOffersPage> {
       final result = await MarketplaceV2Service.instance.acceptOffer(offer.id);
       if (!mounted) return;
       V2Feedback.showSuccess(context, l10n.ownerAcceptOfferSuccess);
-      if (result.bookingId.isNotEmpty && result.status == 'awaitingPayment') {
+      if (result.bookingId.isNotEmpty &&
+          result.status.toLowerCase().replaceAll('_', '') == 'awaitingpayment') {
         await Navigator.of(context).pushReplacement(
           V2PageRoute<void>(
             page: PaymentGuidePage(bookingId: result.bookingId),

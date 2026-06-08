@@ -1,12 +1,14 @@
+import 'package:flutter/foundation.dart';
 import 'package:kaki_empat/core/models/auth_user_v2.dart';
 import 'package:kaki_empat/core/web/domain_kind.dart';
+import 'package:kaki_empat/core/web/host_reader.dart';
 
-/// Fase peluncuran subdomain — owner = mesin uang (fase 1).
+/// Fase peluncuran subdomain — owner + sitter = MVP inti (fase 1–2).
 enum LaunchPhase {
-  /// www + owner publik; sitter hanya akun verified; admin internal.
+  /// www + owner publik; sitter verified; admin/staging/www-growth ditunda.
   ownerFirst,
 
-  /// + promosi aplikasi sitter di www.
+  /// + promosi aplikasi sitter di www (dua subdomain MVP terbuka penuh).
   marketplace,
 
   /// + komunitas, wallet, loyalty, blog www.
@@ -18,8 +20,31 @@ enum LaunchPhase {
 
 /// Batas fitur & akses subdomain saat rollout bertahap.
 abstract final class MvpScope {
-  /// Ubah ke [LaunchPhase.marketplace] saat siap buka sitter ke publik.
-  static const phase = LaunchPhase.ownerFirst;
+  /// Fase aktif — override saat build: `--dart-define=LAUNCH_PHASE=full`
+  /// Staging selalu [LaunchPhase.full] untuk QA super-app.
+  static LaunchPhase get phase => _resolvePhase();
+
+  static LaunchPhase _resolvePhase() {
+    if (kIsWeb) {
+      final host = readWebHostname().trim().toLowerCase();
+      if (host == 'staging.kakiempat.com') {
+        return LaunchPhase.full;
+      }
+    }
+
+    const raw = String.fromEnvironment('LAUNCH_PHASE', defaultValue: 'full');
+    for (final candidate in LaunchPhase.values) {
+      if (candidate.name == raw) return candidate;
+    }
+    return LaunchPhase.full;
+  }
+
+  /// Urutan fase super-app untuk panel admin & dokumentasi deploy.
+  static const List<LaunchPhase> rolloutOrder = LaunchPhase.values;
+
+  /// Subdomain MVP inti — prioritas solo dev.
+  static const WebDomain mvpSupplySide = WebDomain.sitter;
+  static const WebDomain mvpDemandSide = WebDomain.owner;
 
   /// Subdomain yang menghasilkan pendapatan — prioritas UX & stabilitas.
   static const WebDomain moneyEngine = WebDomain.owner;
@@ -56,9 +81,11 @@ abstract final class MvpScope {
   static bool get showPersonalizedRecommendations =>
       phase.index >= LaunchPhase.growth.index;
 
-  /// Shell navigasi terpadu + discover partner (fase full).
-  static bool get showUnifiedAppShell => phase.index >= LaunchPhase.full.index;
+  /// Shell navigasi terpadu (fase growth+).
+  static bool get showUnifiedAppShell =>
+      phase.index >= LaunchPhase.growth.index;
 
+  /// Discover partner + bisnis (fase full).
   static bool get showPartnerDiscover =>
       phase.index >= LaunchPhase.full.index;
 

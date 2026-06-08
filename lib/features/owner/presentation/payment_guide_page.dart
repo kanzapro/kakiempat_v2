@@ -118,9 +118,8 @@ class _PaymentGuidePageState extends State<PaymentGuidePage>
   }
 
   bool _shouldPollForPayment(String status) {
-    return status == 'awaitingPayment' ||
-        status == 'AWAITING_PAYMENT' ||
-        status == 'PENDING_VERIFICATION';
+    final normalized = status.toLowerCase().replaceAll('_', '');
+    return normalized == 'awaitingpayment' || normalized == 'pendingverification';
   }
 
   void _maybeStartPolling() {

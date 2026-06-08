@@ -9,11 +9,12 @@ class BookingStatusChip extends StatelessWidget {
   final String status;
 
   Color _color(ColorScheme scheme) {
-    return switch (status.toLowerCase()) {
+    final normalized = status.toLowerCase().replaceAll('_', '');
+    return switch (normalized) {
       'paid' => AppColors.statusSuccess(scheme),
       'awaitingpayment' => AppColors.statusWarning(scheme),
-      'pending_verification' => AppColors.statusInfo(scheme),
-      'payment_rejected' => AppColors.statusError(scheme),
+      'pendingverification' => AppColors.statusInfo(scheme),
+      'paymentrejected' => AppColors.statusError(scheme),
       'open' => AppColors.statusSuccess(scheme),
       'matched' || 'pending' => AppColors.statusInfo(scheme),
       'confirmed' => AppColors.statusInfo(scheme),

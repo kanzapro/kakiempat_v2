@@ -3848,6 +3848,18 @@ abstract class AppLocalizations {
   /// **'Belum ada layanan partner.'**
   String get discoverEmpty;
 
+  /// No description provided for @discoverBusinessesTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Mitra bisnis terverifikasi'**
+  String get discoverBusinessesTitle;
+
+  /// No description provided for @discoverServicesTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Mini-layanan partner'**
+  String get discoverServicesTitle;
+
   /// No description provided for @discoverComingSoon.
   ///
   /// In id, this message translates to:
@@ -3913,6 +3925,132 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Kode referral disalin'**
   String get referralCopied;
+
+  /// No description provided for @appShellProfile.
+  ///
+  /// In id, this message translates to:
+  /// **'Profil'**
+  String get appShellProfile;
+
+  /// No description provided for @petTimelineTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Linimasa hewan'**
+  String get petTimelineTitle;
+
+  /// No description provided for @petTimelineSubtitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Riwayat aktivitas'**
+  String get petTimelineSubtitle;
+
+  /// No description provided for @petTimelineEmpty.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum ada aktivitas untuk hewan ini.'**
+  String get petTimelineEmpty;
+
+  /// No description provided for @notificationsFilterAll.
+  ///
+  /// In id, this message translates to:
+  /// **'Semua'**
+  String get notificationsFilterAll;
+
+  /// No description provided for @notificationsFilterBooking.
+  ///
+  /// In id, this message translates to:
+  /// **'Booking'**
+  String get notificationsFilterBooking;
+
+  /// No description provided for @notificationsFilterPayment.
+  ///
+  /// In id, this message translates to:
+  /// **'Pembayaran'**
+  String get notificationsFilterPayment;
+
+  /// No description provided for @notificationsFilterChat.
+  ///
+  /// In id, this message translates to:
+  /// **'Chat'**
+  String get notificationsFilterChat;
+
+  /// No description provided for @notificationsFilterLoyalty.
+  ///
+  /// In id, this message translates to:
+  /// **'Loyalitas'**
+  String get notificationsFilterLoyalty;
+
+  /// No description provided for @categoryFormHealthTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Detail kunjungan kesehatan'**
+  String get categoryFormHealthTitle;
+
+  /// No description provided for @categoryFormHealthSymptoms.
+  ///
+  /// In id, this message translates to:
+  /// **'Gejala atau keluhan'**
+  String get categoryFormHealthSymptoms;
+
+  /// No description provided for @categoryFormHealthUrgent.
+  ///
+  /// In id, this message translates to:
+  /// **'Mendesak — butuh penanganan hari ini'**
+  String get categoryFormHealthUrgent;
+
+  /// No description provided for @categoryFormGroomingTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Preferensi grooming'**
+  String get categoryFormGroomingTitle;
+
+  /// No description provided for @categoryFormGroomingPackage.
+  ///
+  /// In id, this message translates to:
+  /// **'Paket atau gaya'**
+  String get categoryFormGroomingPackage;
+
+  /// No description provided for @categoryFormGroomingPackageHint.
+  ///
+  /// In id, this message translates to:
+  /// **'mis. mandi lengkap, potong kuku, potong ras'**
+  String get categoryFormGroomingPackageHint;
+
+  /// No description provided for @categoryFormTransportTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Detail transport'**
+  String get categoryFormTransportTitle;
+
+  /// No description provided for @categoryFormTransportPickup.
+  ///
+  /// In id, this message translates to:
+  /// **'Alamat jemput'**
+  String get categoryFormTransportPickup;
+
+  /// No description provided for @categoryFormTransportDropoff.
+  ///
+  /// In id, this message translates to:
+  /// **'Alamat antar'**
+  String get categoryFormTransportDropoff;
+
+  /// No description provided for @categoryFormTransportCrate.
+  ///
+  /// In id, this message translates to:
+  /// **'Ukuran kandang'**
+  String get categoryFormTransportCrate;
+
+  /// No description provided for @categorySupplyUnavailable.
+  ///
+  /// In id, this message translates to:
+  /// **'Kategori layanan ini belum tersedia di area Anda.'**
+  String get categorySupplyUnavailable;
+
+  /// No description provided for @appSwitcherPartner.
+  ///
+  /// In id, this message translates to:
+  /// **'Dashboard partner'**
+  String get appSwitcherPartner;
 }
 
 class _AppLocalizationsDelegate

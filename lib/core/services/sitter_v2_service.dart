@@ -18,6 +18,7 @@ class SitterV2Service {
     required String address,
     required String bio,
     required List<String> services,
+    required String kecamatan,
     double? latitude,
     double? longitude,
   }) async {
@@ -28,6 +29,7 @@ class SitterV2Service {
         'address': address,
         'bio': bio,
         'services': services,
+        'kecamatan': kecamatan,
         'latitude': ?latitude,
         'longitude': ?longitude,
       },

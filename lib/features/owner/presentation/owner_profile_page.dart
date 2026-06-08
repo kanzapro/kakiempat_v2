@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:kaki_empat/core/config/denpasar_kecamatan.dart';
 import 'package:kaki_empat/core/config/mvp_scope.dart';
 import 'package:kaki_empat/core/navigation/v2_page_route.dart';
 import 'package:kaki_empat/core/models/v2_domain_models.dart';
 import 'package:kaki_empat/core/services/booking_v2_service.dart';
 import 'package:kaki_empat/core/formatters/v2_formatters.dart';
 import 'package:kaki_empat/core/services/owner_v2_service.dart';
-import 'package:kaki_empat/core/utils/geolocation_capture.dart';
 import 'package:kaki_empat/core/services/user_v2_service.dart';
 import 'package:kaki_empat/core/services/v2_api_client.dart';
 import 'package:kaki_empat/core/theme/theme_notifier.dart';
@@ -15,6 +15,7 @@ import 'package:kaki_empat/core/web/domain_router.dart';
 import 'package:kaki_empat/features/owner/presentation/add_pet_page.dart';
 import 'package:kaki_empat/features/owner/presentation/owner_home_page.dart';
 import 'package:kaki_empat/features/shared/presentation/booking_history_page.dart';
+import 'package:kaki_empat/features/shared/widgets/kecamatan_dropdown.dart';
 import 'package:kaki_empat/features/shared/widgets/v2_empty_state.dart';
 import 'package:kaki_empat/features/shared/widgets/v2_error_state.dart';
 import 'package:kaki_empat/features/shared/widgets/v2_loading_skeleton.dart';
@@ -33,6 +34,7 @@ class OwnerProfilePage extends StatefulWidget {
 class _OwnerProfilePageState extends State<OwnerProfilePage> {
   final _formKey = GlobalKey<FormState>();
   final _address = TextEditingController();
+  String? _kecamatan;
 
   OwnerProfileResult? _profile;
   int _bookingCount = 0;
@@ -74,6 +76,7 @@ class _OwnerProfilePageState extends State<OwnerProfilePage> {
       }
       if (!mounted) return;
       _address.text = profile.profile?.address ?? '';
+      _kecamatan = profile.profile?.kecamatan;
       setState(() {
         _profile = profile;
         _bookingCount = bookings.length;
@@ -98,19 +101,18 @@ class _OwnerProfilePageState extends State<OwnerProfilePage> {
 
   Future<void> _saveAddress() async {
     if (!_formKey.currentState!.validate()) return;
+    if (!DenpasarKecamatan.isValid(_kecamatan)) {
+      setState(() => _error = 'Pilih kecamatan Denpasar.');
+      return;
+    }
     setState(() {
       _saving = true;
       _error = null;
     });
     try {
-      final coords = await resolveCoordinates(
-        storedLatitude: _profile?.profile?.latitude,
-        storedLongitude: _profile?.profile?.longitude,
-      );
       final updated = await OwnerV2Service.instance.saveProfile(
         address: _address.text.trim(),
-        latitude: coords?.latitude,
-        longitude: coords?.longitude,
+        kecamatan: _kecamatan!,
       );
       if (!mounted) return;
       setState(() {
@@ -312,17 +314,27 @@ class _OwnerProfilePageState extends State<OwnerProfilePage> {
                         const SizedBox(height: 12),
                         Form(
                           key: _formKey,
-                          child: TextFormField(
-                            controller: _address,
-                            decoration: InputDecoration(
-                              labelText: l10n.ownerProfileAddress,
-                              prefixIcon: const Icon(Icons.home_outlined),
-                            ),
-                            minLines: 2,
-                            maxLines: 4,
-                            validator: (v) => v == null || v.trim().isEmpty
-                                ? l10n.sitterOnboardingAddressRequired
-                                : null,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              KecamatanDropdown(
+                                value: _kecamatan,
+                                onChanged: (value) => setState(() => _kecamatan = value),
+                              ),
+                              const SizedBox(height: 12),
+                              TextFormField(
+                                controller: _address,
+                                decoration: InputDecoration(
+                                  labelText: l10n.ownerProfileAddress,
+                                  prefixIcon: const Icon(Icons.home_outlined),
+                                ),
+                                minLines: 2,
+                                maxLines: 4,
+                                validator: (v) => v == null || v.trim().isEmpty
+                                    ? l10n.sitterOnboardingAddressRequired
+                                    : null,
+                              ),
+                            ],
                           ),
                         ),
                         const SizedBox(height: 12),

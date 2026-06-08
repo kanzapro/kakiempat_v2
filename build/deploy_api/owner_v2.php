@@ -7,7 +7,7 @@ declare(strict_types=1);
  *
  * POST ?action=save_profile
  * POST ?action=add_pet|update_pet|delete_pet
- * GET  ?action=get_profile|get_dashboard
+ * GET  ?action=get_profile|get_dashboard|get_pet_timeline
  */
 require_once __DIR__ . '/lib/kakiempat_owner_v2.php';
 
@@ -60,10 +60,16 @@ try {
             }
             kakiempat_owner_v2_get_dashboard();
             break;
+        case 'get_pet_timeline':
+            if ($method !== 'GET') {
+                v2ApiFail('method_not_allowed', 'Gunakan metode GET.', 405);
+            }
+            kakiempat_owner_v2_get_pet_timeline();
+            break;
         default:
             v2ApiFail(
                 'action_required',
-                'Gunakan save_profile, add_pet, update_pet, delete_pet, get_profile, atau get_dashboard.',
+                'Gunakan save_profile, add_pet, update_pet, delete_pet, get_profile, get_dashboard, atau get_pet_timeline.',
                 400,
             );
     }

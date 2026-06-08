@@ -19,6 +19,7 @@ class DiscoverPage extends StatefulWidget {
 
 class _DiscoverPageState extends State<DiscoverPage> {
   List<PartnerServiceV2> _services = [];
+  List<BusinessPartnerV2> _businesses = [];
   bool _loading = true;
   Object? _error;
 
@@ -34,10 +35,14 @@ class _DiscoverPageState extends State<DiscoverPage> {
       _error = null;
     });
     try {
-      final services = await PartnerV2Service.instance.listServices();
+      final results = await Future.wait([
+        PartnerV2Service.instance.listServices(),
+        PartnerV2Service.instance.listBusinesses(),
+      ]);
       if (!mounted) return;
       setState(() {
-        _services = services;
+        _services = results[0] as List<PartnerServiceV2>;
+        _businesses = results[1] as List<BusinessPartnerV2>;
         _loading = false;
       });
     } on V2ApiException catch (e) {
@@ -81,7 +86,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
                 ? V2ErrorState.fromError(context, error: _error, onRetry: _load)
                 : RefreshIndicator(
                     onRefresh: _load,
-                    child: _services.isEmpty
+                    child: _services.isEmpty && _businesses.isEmpty
                         ? ListView(
                             padding: padding,
                             children: [
@@ -91,29 +96,61 @@ class _DiscoverPageState extends State<DiscoverPage> {
                               ),
                             ],
                           )
-                        : ListView.separated(
+                        : ListView(
                             padding: padding,
-                            itemCount: _services.length,
-                            separatorBuilder: (_, __) => const SizedBox(height: 8),
-                            itemBuilder: (context, index) {
-                              final service = _services[index];
-                              return Card(
-                                child: ListTile(
-                                  leading: Text(
-                                    service.logoEmoji,
-                                    style: const TextStyle(fontSize: 28),
-                                  ),
-                                  title: Text(service.name),
-                                  subtitle: Text(
-                                    service.description.isNotEmpty
-                                        ? service.description
-                                        : service.category,
-                                  ),
-                                  trailing: const Icon(Icons.open_in_new),
-                                  onTap: () => _openPartner(service),
+                            children: [
+                              if (_businesses.isNotEmpty) ...[
+                                Text(
+                                  l10n.discoverBusinessesTitle,
+                                  style: Theme.of(context).textTheme.titleMedium,
                                 ),
-                              );
-                            },
+                                const SizedBox(height: 8),
+                                ..._businesses.map(
+                                  (business) => Card(
+                                    margin: const EdgeInsets.only(bottom: 8),
+                                    child: ListTile(
+                                      leading: const Icon(Icons.storefront_outlined),
+                                      title: Text(business.legalName),
+                                      subtitle: Text(
+                                        [
+                                          if (business.locationKecamatan.isNotEmpty)
+                                            business.locationKecamatan,
+                                          if (business.serviceCodes.isNotEmpty)
+                                            business.serviceCodes.join(', '),
+                                        ].join(' · '),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                              ],
+                              if (_services.isNotEmpty) ...[
+                                Text(
+                                  l10n.discoverServicesTitle,
+                                  style: Theme.of(context).textTheme.titleMedium,
+                                ),
+                                const SizedBox(height: 8),
+                                ..._services.map(
+                                  (service) => Card(
+                                    margin: const EdgeInsets.only(bottom: 8),
+                                    child: ListTile(
+                                      leading: Text(
+                                        service.logoEmoji,
+                                        style: const TextStyle(fontSize: 28),
+                                      ),
+                                      title: Text(service.name),
+                                      subtitle: Text(
+                                        service.description.isNotEmpty
+                                            ? service.description
+                                            : service.category,
+                                      ),
+                                      trailing: const Icon(Icons.open_in_new),
+                                      onTap: () => _openPartner(service),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                   ),
         context,

@@ -84,11 +84,16 @@ class NotificationV2Service {
   Future<NotificationPageResult> getNotifications({
     int page = 1,
     int limit = 20,
+    String? typeFilter,
   }) async {
     final response = await _api.getAuth(
       _script,
       action: 'get_notifications',
-      query: {'page': '$page', 'limit': '$limit'},
+      query: {
+        'page': '$page',
+        'limit': '$limit',
+        if (typeFilter != null && typeFilter.isNotEmpty) 'type': typeFilter,
+      },
     );
     return _api.parse(response, NotificationPageResult.fromJson);
   }
