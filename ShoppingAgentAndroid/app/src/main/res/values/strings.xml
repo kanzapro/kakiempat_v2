@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Shopping Agent</string>
+
+    <!-- Navigasi -->
+    <string name="tab_agent">Agen AI</string>
+    <string name="tab_search">Pencarian</string>
+    <string name="tab_watchlist">Watchlist</string>
+    <string name="tab_settings">Pengaturan</string>
+
+    <!-- Chat -->
+    <string name="chat_title">Agen Belanja AI</string>
+    <string name="chat_input_hint">Tanya apa saja… mis. "Cari TWS ANC di bawah 1jt"</string>
+    <string name="chat_send">Kirim</string>
+    <string name="chat_new_session">Sesi baru</string>
+    <string name="chat_empty_title">Mulai percakapan</string>
+    <string name="chat_empty_subtitle">Ceritakan kebutuhanmu: jenis produk, budget, dan preferensi toko.</string>
+    <string name="agent_thinking">Agen sedang menyusun rekomendasi…</string>
+
+    <!-- Pencarian -->
+    <string name="search_title">Pencarian Produk</string>
+    <string name="search_hint">Cari produk (mis. laptop, TWS)</string>
+    <string name="search_min_price">Harga min</string>
+    <string name="search_max_price">Harga maks</string>
+    <string name="search_result_count">%1$d produk ditemukan</string>
+    <string name="search_empty">Tidak ada produk yang cocok.</string>
+    <string name="offline_banner">Mode offline: menampilkan katalog contoh.</string>
+
+    <!-- Watchlist -->
+    <string name="watchlist_title">Watchlist</string>
+    <string name="watchlist_empty">Belum ada produk yang dipantau.</string>
+    <string name="watchlist_remove">Hapus dari watchlist</string>
+
+    <!-- Produk -->
+    <string name="product_discount">-%1$d%%</string>
+    <string name="product_reviews">%1$s ulasan</string>
+    <string name="product_add_watchlist">Tambah ke watchlist</string>
+    <string name="product_remove_watchlist">Hapus dari watchlist</string>
+
+    <!-- Pengaturan -->
+    <string name="settings_title">Pengaturan</string>
+    <string name="settings_api_key">API Key</string>
+    <string name="settings_model">Model AI</string>
+    <string name="settings_base_url">Base URL Backend</string>
+    <string name="settings_context_budget">Budget Konteks (Rp)</string>
+    <string name="settings_theme">Tema</string>
+    <string name="settings_dynamic_color">Warna dinamis (Material You)</string>
+    <string name="settings_save">Simpan</string>
+    <string name="settings_saved">Tersimpan</string>
+    <string name="theme_system">Ikuti sistem</string>
+    <string name="theme_light">Terang</string>
+    <string name="theme_dark">Gelap</string>
+
+    <!-- Umum -->
+    <string name="action_retry">Coba lagi</string>
+    <string name="action_dismiss">Tutup</string>
+</resources>
