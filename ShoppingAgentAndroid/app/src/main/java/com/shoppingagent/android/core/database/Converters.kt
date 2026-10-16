@@ -3,6 +3,8 @@ package com.shoppingagent.android.core.database
 import androidx.room.TypeConverter
 import com.shoppingagent.android.core.AppJson
 import com.shoppingagent.android.core.model.Product
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
 
 /**
  * Serialisasi JSON kustom untuk menyimpan daftar produk & saran langsung di dalam entitas chat.
